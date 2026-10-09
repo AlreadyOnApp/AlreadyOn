@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 21
-        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.20-dev"
+        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 22
+        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.21-dev"
         buildConfigField("boolean", "IS_TV", "true")
     }
     buildTypes {

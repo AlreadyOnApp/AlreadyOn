@@ -101,7 +101,7 @@ internal class ServerClient(val origin: String, store: SessionStore, bypassTls: 
                         "stream_limit" -> "All simultaneous streams for this account are in use. Stop another stream and try again."
                         "stream_capacity" -> "Server playback capacity is unavailable. Try again shortly."
                         else -> when (it.code) {
-                        401 -> "Sign-in or profile PIN was not accepted."
+                        401 -> if (path == "/api/auth/tv-login") "Username or TV PIN was not accepted." else "Sign-in or profile PIN was not accepted."
                         403 -> "The server refused this request."
                         409 -> "Server setup or schedule changed. Try again."
                         422 -> "This channel cannot play with the phone’s supported formats."

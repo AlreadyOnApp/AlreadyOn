@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--serial", required=True)
     parser.add_argument("--sdk", required=True, type=Path)
     parser.add_argument("--screenshots", type=Path, help="Optional local directory for emulator screenshots")
+    parser.add_argument("--interactive", action="store_true", help="Leave the disposable server running for manual emulator checks until Enter is pressed")
     args = parser.parse_args()
     adb = str(args.sdk / "platform-tools/adb")
     if not args.serial.startswith("emulator-") or run(adb, "-s", args.serial, "shell", "getprop", "ro.kernel.qemu", capture=True).strip() != "1":
@@ -92,19 +93,34 @@ def main():
                         channel = db.execute("SELECT id FROM channels WHERE number=?", (number,)).fetchone()[0]
                         db.execute("UPDATE channels SET hidden=0,visibility='show',name=? WHERE id=?", (f"TV fixture {number}", channel))
                         db.execute("DELETE FROM schedule_entries WHERE channel_id=?", (channel,))
-                        db.execute("INSERT INTO schedule_entries(channel_id,media_file_id,kind,source_offset_seconds,duration_seconds,starts_at_unix,ends_at_unix) VALUES(?,999,'program',0,1800,?,?)", (channel, now - 10, now + 1790))
+                        # Repeat the ten-minute synthetic clip so interactive checks stay playable.
+                        for period in range(12):
+                            start = now - 10 + period * 600
+                            db.execute("INSERT INTO schedule_entries(channel_id,media_file_id,kind,source_offset_seconds,duration_seconds,starts_at_unix,ends_at_unix) VALUES(?,999,'program',0,600,?,?)", (channel, start, start + 600))
                 for apk in ("debug/tv-debug.apk", "androidTest/debug/tv-debug-androidTest.apk"):
                     run(adb, "-s", args.serial, "install", "-r", str(ROOT / "apps/android/tv/build/outputs/apk" / apk))
-                run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.lynchbros.alreadyon.tv.debug")
-                result = run(adb, "-s", args.serial, "shell", "am", "instrument", "-w", "-e", "serverPort", str(port),
-                    "-e", "class", "io.github.lynchbros.alreadyon.TvNavigationTest",
-                    "io.github.lynchbros.alreadyon.tv.debug.test/androidx.test.runner.AndroidJUnitRunner", capture=True)
-                print(result)
-                if args.screenshots:
-                    args.screenshots.mkdir(parents=True, exist_ok=True)
-                    run(adb, "-s", args.serial, "pull", "/sdcard/Android/data/io.github.lynchbros.alreadyon.tv.debug/files/tv-guide.png", str(args.screenshots / "tv-guide.png"))
-                if "OK (1 test)" not in result:
-                    raise RuntimeError("TV instrumentation did not pass")
+                if args.interactive:
+                    run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.lynchbros.alreadyon.tv.debug")
+                    run(adb, "-s", args.serial, "shell", "am", "start", "-n", "io.github.lynchbros.alreadyon.tv.debug/io.github.lynchbros.alreadyon.MainActivity")
+                    print(f"Manual emulator address after 30 seconds: https://10.0.2.2:{port}", flush=True)
+                    print("Synthetic username: tv-fixture; TV PIN: 123456. The app accepts the server certificate automatically.", flush=True)
+                    import hashlib
+                    fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(ca.read_text())).hexdigest()
+                    print(f"Expected certificate fingerprint: {fingerprint}", flush=True)
+                    print(f"Fixture WebUI: {base}; password only for WebUI: synthetic-tv-fixture-pass", flush=True)
+                    input("Press Enter to stop the disposable fixture: ")
+                    return
+                for entry_mode in ("discovery", "manual"):
+                    run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.lynchbros.alreadyon.tv.debug")
+                    result = run(adb, "-s", args.serial, "shell", "am", "instrument", "-w", "-e", "serverPort", str(port),
+                        "-e", "entryMode", entry_mode, "-e", "class", "io.github.lynchbros.alreadyon.TvNavigationTest",
+                        "io.github.lynchbros.alreadyon.tv.debug.test/androidx.test.runner.AndroidJUnitRunner", capture=True)
+                    print(result)
+                    if args.screenshots:
+                        args.screenshots.mkdir(parents=True, exist_ok=True)
+                        run(adb, "-s", args.serial, "pull", "/sdcard/Android/data/io.github.lynchbros.alreadyon.tv.debug/files/tv-guide.png", str(args.screenshots / f"tv-guide-{entry_mode}.png"))
+                    if "OK (1 test)" not in result:
+                        raise RuntimeError("TV instrumentation did not pass")
             finally:
                 process.terminate()
                 try:

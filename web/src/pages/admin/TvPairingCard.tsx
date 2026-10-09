@@ -42,7 +42,7 @@ export default function TvPairingCard() {
   }
   return <div className="admin-card">
     <h3>TV Sign-In</h3>
-    <p>Set a unique 6–12 digit PIN for your account. On your TV, select this server and enter the PIN to sign in.</p>
+    <p>Set a unique 6–12 digit PIN for your account. In your phone, tablet or TV app, select this server and enter your username and PIN to sign in.</p>
     <p>{enabled ? 'Your TV PIN is configured.' : 'Your TV PIN is not configured.'}</p>
     <form className="tv-pairing-form" onSubmit={event => void save(event)}>
       <label htmlFor="tv-pairing-pin">{enabled ? 'Replace TV PIN' : 'TV PIN'}</label>
@@ -53,7 +53,7 @@ export default function TvPairingCard() {
       {enabled && <button className="admin-btn" type="button" disabled={busy} onClick={() => void save()}>Remove TV PIN</button>}
     </form>
     {message && <p role="status">{message}</p>}
-    {fingerprint && <p>Compare this certificate fingerprint with the TV before confirming the server: <code style={{ overflowWrap: 'anywhere' }}>{fingerprint}</code></p>}
+    {fingerprint && <p>Server certificate fingerprint: <code style={{ overflowWrap: 'anywhere' }}>{fingerprint}</code></p>}
     <p>Removing or replacing a PIN prevents new sign-ins. Use Signed-In Browsers below to sign out an already paired TV.</p>
   </div>;
 }

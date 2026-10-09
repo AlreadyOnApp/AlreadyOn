@@ -87,12 +87,13 @@ func handleTVLogin(db *sql.DB, limiter *auth.Limiter, cookieName string) http.Ha
 			}
 		}
 		var body struct {
-			PIN string `json:"pin"`
+			Username string `json:"username"`
+			PIN      string `json:"pin"`
 		}
 		if !decodeStrict(w, r, &body) {
 			return
 		}
-		user, ok, err := auth.AuthenticateTVPIN(r.Context(), db, body.PIN)
+		user, ok, err := auth.AuthenticateTVPIN(r.Context(), db, body.Username, body.PIN)
 		if err != nil {
 			writeJSONError(w, 500, "could not authenticate TV")
 			return
@@ -100,7 +101,7 @@ func handleTVLogin(db *sql.DB, limiter *auth.Limiter, cookieName string) http.Ha
 		if !ok {
 			limiter.Fail(client)
 			limiter.Fail("tv:all")
-			writeJSONError(w, 401, "TV PIN was not accepted")
+			writeJSONError(w, 401, "Username or TV PIN was not accepted")
 			return
 		}
 		limiter.Succeed(client)

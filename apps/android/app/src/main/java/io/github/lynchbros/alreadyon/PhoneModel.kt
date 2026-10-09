@@ -116,12 +116,12 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         update { it.copy(profiles = profiles) }
     }
 
-    /** The TV confirms an instance CA before sending its PIN or saving a session. */
-    fun pairTV(origin: String, pin: String, trustedCa: String) = perform {
+    /** Native clients accept an instance CA before sending its PIN or saving a session. */
+    fun signInWithPIN(origin: String, username: String, pin: String, trustedCa: String) = perform {
         val normalized = serverOrigin(origin) ?: throw IOException("Invalid local server address.")
         client?.clearSession()
         val api = ServerClient(normalized, sessionStore, trustedCa = trustedCa)
-        val status = JSONObject(api.request("/api/auth/tv-login", "POST", JSONObject().put("pin", pin)))
+        val status = JSONObject(api.request("/api/auth/tv-login", "POST", JSONObject().put("username", username.trim()).put("pin", pin)))
         if (!status.optBoolean("authenticated")) throw IOException("TV PIN was not accepted.")
         client = api
         preferences.edit().putString("server_origin", normalized).putBoolean("bypass_tls", false)

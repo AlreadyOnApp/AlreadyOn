@@ -14,11 +14,11 @@ android {
         minSdk = 26
         targetSdk = 36
         buildConfigField("boolean", "IS_TV", "false")
-        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 21
-        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.20-dev"
+        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 22
+        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.21-dev"
     }
     buildTypes {
-        debug { applicationIdSuffix = ".debug" }
+        debug { applicationIdSuffix = providers.gradleProperty("androidDebugSuffix").orNull ?: ".debug" }
         // Release signing is intentionally unconfigured until the owner supplies a key.
         release { isMinifyEnabled = false }
     }

@@ -27,7 +27,7 @@ func TestTVPairingAccountIsolationAndLocalBoundary(t *testing.T) {
 	}
 	handler := auth.RequireAuth(db, NewRouter(t.TempDir(), t.TempDir(), db))
 	request := func(pin, peer string, secure bool) *httptest.ResponseRecorder {
-		r := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"pin":"`+pin+`"}`))
+		r := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"username":"viewer","pin":"`+pin+`"}`))
 		r.RemoteAddr = peer
 		r.Header.Set("X-Forwarded-For", "192.168.1.2")
 		if strings.HasPrefix(peer, "192.168.") {
@@ -48,7 +48,7 @@ func TestTVPairingAccountIsolationAndLocalBoundary(t *testing.T) {
 			t.Fatalf("boundary: %d %s", w.Code, w.Body.String())
 		}
 	}
-	forwarded := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"pin":"654321"}`))
+	forwarded := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"username":"viewer","pin":"654321"}`))
 	forwarded.TLS = &tls.ConnectionState{}
 	forwarded.RemoteAddr = "192.168.1.2:1234"
 	forwarded.Header.Set("X-Forwarded-For", "8.8.8.8")
@@ -56,6 +56,14 @@ func TestTVPairingAccountIsolationAndLocalBoundary(t *testing.T) {
 	handler.ServeHTTP(rejected, forwarded)
 	if rejected.Code != 403 {
 		t.Fatal("proxied internet peer allowed to pair")
+	}
+	wrongUser := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"username":"owner","pin":"654321"}`))
+	wrongUser.RemoteAddr = "192.168.1.2:1234"
+	wrongUser.TLS = &tls.ConnectionState{}
+	denied := httptest.NewRecorder()
+	handler.ServeHTTP(denied, wrongUser)
+	if denied.Code != 401 {
+		t.Fatal("PIN accepted with another account's username")
 	}
 	w := request("654321", "192.168.1.2:1234", true)
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"username":"viewer"`) {
@@ -102,20 +110,20 @@ func TestTVPINValidationUniquenessDisabledAndThrottling(t *testing.T) {
 	if err := auth.SetTVPIN(t.Context(), db, viewer.ID, "001234"); err != auth.ErrTVPINTaken {
 		t.Fatalf("duplicate PIN: %v", err)
 	}
-	if _, ok, err := auth.AuthenticateTVPIN(t.Context(), db, "001234"); err != nil || !ok {
+	if _, ok, err := auth.AuthenticateTVPIN(t.Context(), db, "owner", "001234"); err != nil || !ok {
 		t.Fatalf("leading zeros: %v %v", ok, err)
 	}
 	_, _ = db.Exec(`UPDATE users SET must_change_password = 1 WHERE id = ?`, owner.ID)
-	if _, ok, _ := auth.AuthenticateTVPIN(t.Context(), db, "001234"); ok {
+	if _, ok, _ := auth.AuthenticateTVPIN(t.Context(), db, "owner", "001234"); ok {
 		t.Fatal("forced password change bypassed")
 	}
 	_, _ = db.Exec(`UPDATE users SET disabled = 1, must_change_password = 0 WHERE id = ?`, owner.ID)
-	if _, ok, _ := auth.AuthenticateTVPIN(t.Context(), db, "001234"); ok {
+	if _, ok, _ := auth.AuthenticateTVPIN(t.Context(), db, "owner", "001234"); ok {
 		t.Fatal("disabled account paired")
 	}
 	handler := auth.RequireAuth(db, NewRouter(t.TempDir(), t.TempDir(), db))
 	for i := 0; i < 6; i++ {
-		r := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"pin":"999999"}`))
+		r := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"username":"owner","pin":"999999"}`))
 		r.TLS = &tls.ConnectionState{}
 		r.RemoteAddr = "192.168.1.4:1234"
 		w := httptest.NewRecorder()
