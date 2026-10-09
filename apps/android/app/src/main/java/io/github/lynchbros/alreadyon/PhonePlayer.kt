@@ -1,10 +1,8 @@
 package io.github.lynchbros.alreadyon
 
-import android.content.res.Configuration
 import android.os.SystemClock
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -182,8 +180,7 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
     }
     val silent = state.muted
     fun interact(action: () -> Unit) { interaction++; visible = true; action() }
-    val swipeEnabled = fullscreen && !pictureInPicture && !menu &&
-        LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val swipeEnabled = fullscreen && !pictureInPicture && !menu
     val swipeThreshold = with(density) { 64.dp.toPx() }
     // Wait for release and require deliberate travel; taps and short drags do not tune.
     val swipeModifier = if (swipeEnabled) Modifier.pointerInput(model, swipeThreshold) {
