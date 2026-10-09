@@ -14,4 +14,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "AlreadyOnAndroid"
-include(":app")
+include(":app", ":tv")

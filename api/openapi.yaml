@@ -183,6 +183,126 @@ paths:
         '409': { description: Stale airing or unavailable commercial }
         '500': { description: Filesystem or catalog failure }
 
+  /api/tv/server:
+    get:
+      x-alreadyon-roles: [public]
+      operationId: discoverTVServer
+      tags: [auth]
+      security: []
+      summary: Read local server name and TV pairing availability
+      description: Requires HTTPS and a direct private, loopback or link-local socket peer. Never lists accounts.
+      responses:
+        '200':
+          description: Server name, pairingEnabled flag and protocol version
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, pairingEnabled, protocol]
+                properties:
+                  name: {type: string}
+                  pairingEnabled: {type: boolean}
+                  protocol: {type: integer, enum: [1]}
+        '403':
+          description: Not a local HTTPS request
+  /api/tv/trust:
+    get:
+      x-alreadyon-roles: [public]
+      operationId: getTVTrust
+      tags: [auth]
+      security: []
+      summary: Read the public certificate trust anchor for explicit local TV confirmation
+      description: Requires HTTPS and a direct LAN peer. Compare the SHA-256 fingerprint with Admin Settings before sending a PIN; discovery is not proof of identity.
+      responses:
+        '200':
+          description: Public PEM certificate and fingerprint, never private keys
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [certificate, fingerprint]
+                properties:
+                  certificate: {type: string}
+                  fingerprint: {type: string}
+        '403':
+          description: Not a local HTTPS request
+  /api/auth/tv-login:
+    post:
+      x-alreadyon-roles: [public]
+      operationId: loginTV
+      tags: [auth]
+      security: []
+      summary: Sign in to the account identified by a unique TV PIN on the LAN
+      description: Requires HTTPS and a direct LAN peer. Subject to per-peer and aggregate failed-attempt limits and bounded credential concurrency. Disabled accounts or accounts requiring password changes cannot pair.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              additionalProperties: false
+              properties:
+                pin: {type: string, pattern: '^[0-9]{6,12}$'}
+      responses:
+        '200':
+          description: Signed in with the existing secure account session cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthStatus'
+        '401':
+          description: PIN not accepted
+        '403':
+          description: Not a local HTTPS request
+        '429':
+          description: Pairing rate or concurrency limit reached
+  /api/auth/tv-pin:
+    get:
+      x-alreadyon-roles: [owner, viewer]
+      operationId: getOwnTVPIN
+      tags: [auth]
+      summary: Read whether the signed-in account has a TV PIN
+      responses:
+        '200':
+          description: Enabled flag only; PIN and digest are never returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: {type: boolean}
+    put:
+      x-alreadyon-roles: [owner, viewer]
+      operationId: setOwnTVPIN
+      tags: [auth]
+      summary: Set or replace the signed-in account's unique TV PIN
+      description: Does not revoke existing sessions; use the existing session revocation endpoints to sign out paired TVs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              additionalProperties: false
+              properties:
+                pin: {type: string, pattern: '^[0-9]{6,12}$'}
+      responses:
+        '200':
+          description: PIN saved
+        '400':
+          description: PIN must be 6–12 ASCII digits
+        '409':
+          description: Another account already uses that PIN
+    delete:
+      x-alreadyon-roles: [owner, viewer]
+      operationId: clearOwnTVPIN
+      tags: [auth]
+      summary: Remove the signed-in account's TV PIN without revoking existing sessions
+      responses:
+        '204':
+          description: PIN removed
   /api/auth/status:
     get:
       x-alreadyon-roles: [public]

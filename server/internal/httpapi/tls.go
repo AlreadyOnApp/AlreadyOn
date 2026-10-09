@@ -11,6 +11,12 @@ import (
 // RegisterTLS exposes public trust metadata/download and administrator SAN
 // changes behind the existing management authentication and CSRF boundary.
 func RegisterTLS(mux *http.ServeMux, manager *instancetls.Manager) {
+	mux.HandleFunc("GET /api/tv/trust", func(w http.ResponseWriter, r *http.Request) {
+		if !tvLAN(w, r) {
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"certificate": string(manager.TrustPEM()), "fingerprint": manager.Status().Fingerprint})
+	})
 	mux.HandleFunc("PUT /api/settings/tls/acme", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Hostname string `json:"hostname"`

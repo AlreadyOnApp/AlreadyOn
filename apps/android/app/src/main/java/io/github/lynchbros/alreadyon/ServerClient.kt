@@ -51,10 +51,10 @@ internal fun sameOrigin(a: HttpUrl, b: HttpUrl): Boolean =
     a.scheme == b.scheme && a.host == b.host && a.port == b.port
 
 /** HTTPS API client using server sessions and the existing same-origin write contract. */
-internal class ServerClient(val origin: String, store: SessionStore, bypassTls: Boolean = false) {
+internal class ServerClient(val origin: String, store: SessionStore, bypassTls: Boolean = false, trustedCa: String? = null) {
     private val base = origin.toHttpUrl()
     private val cookies = SessionCookies(base, store)
-    private val http = OkHttpClient.Builder().serverTls(base, bypassTls).cookieJar(cookies)
+    private val http = OkHttpClient.Builder().serverTls(base, bypassTls, trustedCa).cookieJar(cookies)
         .followRedirects(false).followSslRedirects(false)
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(90, TimeUnit.SECONDS)
         .callTimeout(120, TimeUnit.SECONDS).build()
@@ -73,7 +73,7 @@ internal class ServerClient(val origin: String, store: SessionStore, bypassTls: 
                 else (body ?: JSONObject()).toString().toRequestBody("application/json".toMediaType())
             val call = http.newCall(Request.Builder().url(url).method(method, payload)
                 .header("Origin", origin).header("Accept", "application/json")
-                .header("User-Agent", "AlreadyOn-Android/0.1.0").build())
+                .header("User-Agent", "AlreadyOn-Android/${if (BuildConfig.IS_TV) "TV" else "Mobile"}").build())
             val response = suspendCancellableCoroutine<Response> { continuation ->
                 continuation.invokeOnCancellation { call.cancel() }
                 call.enqueue(object : Callback {
@@ -110,7 +110,7 @@ internal class ServerClient(val origin: String, store: SessionStore, bypassTls: 
                         else -> "Server request failed (${it.code})."
                     }
                     }
-                    val expired = it.code == 401 && path != "/api/auth/login" && !path.endsWith("/verify-pin")
+                    val expired = it.code == 401 && path != "/api/auth/login" && path != "/api/auth/tv-login" && !path.endsWith("/verify-pin")
                     if (expired) clearSession()
                     throw ServerFailure(it.code, message, sessionExpired = expired, code = code)
                 }

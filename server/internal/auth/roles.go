@@ -10,6 +10,10 @@ import "net/http"
 // The OpenAPI document marks each operation with x-alreadyon-roles; a test
 // keeps that marking and this list identical.
 var viewerRoutes = []string{
+	// Own TV pairing PIN and sign-in settings.
+	"GET /api/auth/tv-pin",
+	"PUT /api/auth/tv-pin",
+	"DELETE /api/auth/tv-pin",
 	// Own sign-in, password and browser sessions.
 	"GET /api/auth/status",
 	"POST /api/auth/logout",

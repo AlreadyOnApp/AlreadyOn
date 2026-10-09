@@ -77,6 +77,15 @@ func NewRouterWithSessionCookie(webDir, uploadDir string, db *sql.DB, cookieName
 			}
 		}
 	}
+	mux.HandleFunc("GET /api/tv/server", handleTVServer(db))
+	mux.HandleFunc("POST /api/auth/tv-login", credentialHandler(handleTVLogin(db, loginLimiter, cookieName)))
+	for _, method := range []string{"GET", "PUT", "DELETE"} {
+		handler := handleTVPIN(db)
+		if method == "PUT" {
+			handler = credentialHandler(handler)
+		}
+		mux.HandleFunc(method+" /api/auth/tv-pin", handler)
+	}
 	mux.HandleFunc("GET /api/auth/status", handleAuthStatus(db))
 	mux.HandleFunc("POST /api/auth/setup", credentialHandler(handleAuthSetup(db, cookieName)))
 	mux.HandleFunc("POST /api/auth/login", credentialHandler(handleAuthLogin(db, loginLimiter, cookieName)))

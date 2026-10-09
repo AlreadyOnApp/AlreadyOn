@@ -81,6 +81,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val model: PhoneModel = viewModel()
             val state by model.state.collectAsStateWithLifecycle()
+            if (BuildConfig.IS_TV) {
+                TvShell(state, model)
+                return@setContent
+            }
             val owner = LocalLifecycleOwner.current
             var fullscreen by rememberSaveable { mutableStateOf(false) }
             val orientation = LocalConfiguration.current.orientation
@@ -179,7 +183,7 @@ class MainActivity : ComponentActivity() {
 
 /** Profile administration is separate from the account's Owner authorization. */
 @Composable
-private fun ProfileMenu(state: PhoneState, model: PhoneModel) {
+internal fun ProfileMenu(state: PhoneState, model: PhoneModel) {
     var open by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { open = true }) { ProfileName(state.profile!!, model) }
@@ -193,7 +197,7 @@ private fun ProfileMenu(state: PhoneState, model: PhoneModel) {
 
 /** Password values remain in memory and disappear when this screen is removed. */
 @Composable
-private fun AccountScreen(state: PhoneState, model: PhoneModel, forced: Boolean = false) {
+internal fun AccountScreen(state: PhoneState, model: PhoneModel, forced: Boolean = false) {
     var current by remember { mutableStateOf("") }
     var username by remember(state.username) { mutableStateOf(state.username) }
     var password by remember { mutableStateOf("") }
@@ -266,7 +270,7 @@ private fun LoginScreen(state: PhoneState, model: PhoneModel) {
 }
 
 @Composable
-private fun ProfileScreen(state: PhoneState, model: PhoneModel) {
+internal fun ProfileScreen(state: PhoneState, model: PhoneModel) {
     var selected by remember { mutableStateOf<ViewerProfile?>(null) }
     var pin by remember { mutableStateOf("") }
     val linkPixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_PT, 2f, LocalContext.current.resources.displayMetrics)
@@ -278,7 +282,7 @@ private fun ProfileScreen(state: PhoneState, model: PhoneModel) {
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
         items(state.profiles, key = { it.id }) { profile ->
             Button(onClick = { if (profile.hasPin) { selected = profile; pin = "" } else model.selectProfile(profile, "") },
-                enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(4.dp)) {
+                enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tvFocusOutline(), shape = RoundedCornerShape(4.dp)) {
                 ProfileName(profile, model)
             }
         }
@@ -302,7 +306,7 @@ private fun ProfileScreen(state: PhoneState, model: PhoneModel) {
 }
 
 @Composable
-private fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePalette, modifier: Modifier) {
+internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePalette, modifier: Modifier, onTune: (GuideChannel) -> Unit = model::watch) {
     val channels = state.channels
     val format = remember(state.profile?.timeFormat) { DateTimeFormatter.ofPattern(when (state.profile?.timeFormat) {
         "24h" -> "HH:mm"; "12h-padded" -> "hh:mma"; else -> "h:mma"
@@ -335,8 +339,8 @@ private fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePal
             if (channels.isEmpty()) item { Text("No channels are available for this profile.") }
             items(channels, key = { it.id }) { channel ->
                 Row(Modifier.fillMaxWidth().height(72.dp)) {
-                    Surface(onClick = { model.watch(channel) }, color = palette.alternate,
-                        shape = MaterialTheme.shapes.small, modifier = Modifier.width(100.dp).fillMaxHeight()) {
+                    Surface(onClick = { onTune(channel) }, color = palette.alternate,
+                        shape = MaterialTheme.shapes.small, modifier = Modifier.width(100.dp).fillMaxHeight().tvFocusOutline()) {
                         Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.Center) {
                             Text(channel.number.toString(), style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp))
                             Text(channel.name, maxLines = 2, style = MaterialTheme.typography.bodySmall)
@@ -351,7 +355,7 @@ private fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePal
                                 val block = ((end.coerceAtMost(origin + 12 * 60 * 60_000L) - begin.coerceAtLeast(origin)) / 60_000f * minutesToDp).coerceAtLeast(0f).dp
                                 if (block.value > 0) {
                                     val current = begin <= now && end > now
-                                    Surface(onClick = { model.watch(channel) }, modifier = Modifier.offset(x = left).width(block).fillMaxHeight().padding(start = 3.dp)
+                                    Surface(onClick = { onTune(channel) }, modifier = Modifier.offset(x = left).width(block).fillMaxHeight().padding(start = 3.dp).tvFocusOutline()
                                             .then(if (current && channel.id == state.channel?.id) Modifier.border(2.dp, Color.Red, MaterialTheme.shapes.small) else Modifier),
                                         color = if (current) palette.now else palette.surface, shape = MaterialTheme.shapes.small) {
                                         Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -388,7 +392,7 @@ internal fun isLoopback(host: String): Boolean {
 
 // Keep the app wordmark and launcher icon on the shared, font-free brand paths.
 @Composable
-private fun PhoneBrand(onHome: () -> Unit) {
+internal fun PhoneBrand(onHome: () -> Unit) {
     // Wordmark visible height is 88/601 of its width; icon padding is 80/108.
     val wordmarkHeight = 170.dp * (88f / 601f)
     val iconSize = wordmarkHeight * 1.05f * (108f / 80f)

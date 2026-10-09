@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
@@ -66,7 +68,7 @@ private fun NativeVideo(playback: PhonePlayback, model: PhoneModel, modifier: Mo
         val mediaPrefix = authorized.encodedPath.substringBeforeLast('/') + "/"
         val token = authorized.queryParameter("token") ?: throw IOException("Media authorization is missing.")
         // Check every manifest/segment request; never follow redirects or send credentials to another host.
-        val http = OkHttpClient.Builder().serverTls(authorized, playback.bypassTls).followRedirects(false).followSslRedirects(false)
+        val http = OkHttpClient.Builder().serverTls(authorized, playback.bypassTls, playback.trustedCa).followRedirects(false).followSslRedirects(false)
             .addInterceptor { chain ->
                 val original = chain.request()
                 val url = original.url
@@ -145,8 +147,13 @@ private fun NativeVideo(playback: PhonePlayback, model: PhoneModel, modifier: Mo
 /** Overlay controls occupy the video surface; fullscreen never reserves guide or toolbar space. */
 @Composable
 internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifier, fullscreen: Boolean, pictureInPicture: Boolean = false,
+    tv: Boolean = false, controlsSignal: Int = 0, onControlsVisibility: (Boolean) -> Unit = {},
     onFullscreen: () -> Unit) {
-    var visible by remember { mutableStateOf(true) }
+    var visible by remember { mutableStateOf(!tv) }
+    val transportFocus = remember { FocusRequester() }
+    LaunchedEffect(controlsSignal) {
+        if (tv && controlsSignal > 0) { visible = true }
+    }
     var controlsHeight by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     var interaction by remember { mutableIntStateOf(0) }
@@ -180,7 +187,7 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
     }
     val silent = state.muted
     fun interact(action: () -> Unit) { interaction++; visible = true; action() }
-    val swipeEnabled = fullscreen && !pictureInPicture && !menu
+    val swipeEnabled = fullscreen && !pictureInPicture && !menu && !tv
     val swipeThreshold = with(density) { 64.dp.toPx() }
     // Wait for release and require deliberate travel; taps and short drags do not tune.
     val swipeModifier = if (swipeEnabled) Modifier.pointerInput(model, swipeThreshold) {
@@ -208,6 +215,10 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
         val caption = cues.filter { sourceTime >= it.start && sourceTime < it.end }.joinToString("\n") { it.text }
         // Keep captions near the lower edge; reserve overlay clearance only while controls are shown.
         val controlsShown = !pictureInPicture && (visible || state.paused || state.playback == null)
+        LaunchedEffect(controlsShown) { onControlsVisibility(controlsShown) }
+        LaunchedEffect(controlsShown, controlsSignal) {
+            if (tv && fullscreen && controlsShown && state.playback != null) transportFocus.requestFocus()
+        }
         val subtitleLineHeight = with(density) { 20.sp.toDp() }
         val captionInset = if (pictureInPicture) 4.dp else
             ((if (controlsShown) with(density) { controlsHeight.toDp() } + 8.dp else 56.dp) - subtitleLineHeight * 1.5f).coerceAtLeast(4.dp)
@@ -248,7 +259,7 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
                 LinearProgressIndicator(progress = { if (duration > 0) elapsed.toFloat() / duration else 0f },
                         modifier = Modifier.fillMaxWidth().height(4.dp), color = Color(0xff389bea), trackColor = Color.White.copy(alpha = 0.3f))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    WebControl(if (state.paused) "Play" else "Pause", if (state.paused) "M8 5v14l11-7z" else "M6 5h4v14H6zm8 0h4v14h-4z", state.playback != null) { interact(model::togglePause) }
+                    WebControl(if (state.paused) "Play" else "Pause", if (state.paused) "M8 5v14l11-7z" else "M6 5h4v14H6zm8 0h4v14h-4z", state.playback != null, if (tv) Modifier.focusRequester(transportFocus) else Modifier) { interact(model::togglePause) }
                     Text("${clock(elapsed)} / ${clock(duration)}", color = Color.White, fontSize = 10.sp)
                     Spacer(Modifier.weight(1f))
                     WebControl(if (silent) "Unmute" else "Mute", if (silent) "M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.4 2.4-1.4 1.4-2.4-2.4-2.4 2.4-1.4-1.4 2.4-2.4-2.4-2.4 1.4-1.4 2.4 2.4 2.4-2.4 1.4 1.4z" else "M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z") { interact { model.toggleMute(); menu = false } }
@@ -293,12 +304,12 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
 
 /** Use the web SVG geometry with a 48dp touch target rather than text transport buttons. */
 @Composable
-private fun WebControl(label: String, svg: String, enabled: Boolean = true, action: () -> Unit) {
+private fun WebControl(label: String, svg: String, enabled: Boolean = true, modifier: Modifier = Modifier, action: () -> Unit) {
     val vector = remember(svg) {
         ImageVector.Builder(defaultWidth = 18.dp, defaultHeight = 18.dp, viewportWidth = 24f, viewportHeight = 24f)
             .addPath(PathParser().parsePathString(svg).toNodes(), fill = androidx.compose.ui.graphics.SolidColor(Color.White)).build()
     }
-    IconButton(onClick = action, enabled = enabled, modifier = Modifier.size(48.dp)) {
+    IconButton(onClick = action, enabled = enabled, modifier = modifier.size(48.dp).tvFocusOutline()) {
         Icon(vector, contentDescription = label, tint = Color.White, modifier = Modifier.size(18.dp))
     }
 }

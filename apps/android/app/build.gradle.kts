@@ -13,8 +13,9 @@ android {
         applicationId = "io.github.lynchbros.alreadyon"
         minSdk = 26
         targetSdk = 36
-        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 20
-        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.19-dev"
+        buildConfigField("boolean", "IS_TV", "false")
+        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 21
+        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.20-dev"
     }
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
@@ -25,7 +26,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 }
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 

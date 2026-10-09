@@ -25,11 +25,11 @@ import java.time.Instant
 internal data class PhonePlayback(val url: String, val title: String, val startMs: Long, val revision: Long, val hlsTargetMs: Long? = null, val capturedAt: Long = SystemClock.elapsedRealtime(),
     val seriesTitle: String = "", val episodeLabel: String = "", val mediaFileId: Long = -1, val sourceHeight: Int = 720,
     val audioTracks: List<PhoneTrack> = emptyList(), val subtitleTracks: List<PhoneTrack> = emptyList(),
-    val streamOffsetSeconds: Double = 0.0, val hlsOriginMs: Long? = null, val bypassTls: Boolean = false)
+    val streamOffsetSeconds: Double = 0.0, val hlsOriginMs: Long? = null, val bypassTls: Boolean = false, val trustedCa: String? = null)
 internal data class PhoneState(
     val username: String = "", val role: String = "viewer", val mustChangePassword: Boolean = false,
     val passwordLocked: Boolean = true, val settings: String? = null, val notice: String? = null,
-    val origin: String = "", val bypassTls: Boolean = false, val signedIn: Boolean = false, val busy: Boolean = false,
+    val origin: String = "", val bypassTls: Boolean = false, val trustedCa: String? = null, val signedIn: Boolean = false, val busy: Boolean = false,
     val error: String? = null, val profiles: List<ViewerProfile> = emptyList(),
     val profile: ViewerProfile? = null, val channels: List<GuideChannel> = emptyList(),
     val channel: GuideChannel? = null, val playback: PhonePlayback? = null,
@@ -41,7 +41,7 @@ internal data class PhoneState(
 internal class PhoneModel(application: Application) : AndroidViewModel(application) {
     private val sessionStore = SessionStore(application)
     private val preferences = application.getSharedPreferences("connection", Application.MODE_PRIVATE)
-    private val mutable = MutableStateFlow(PhoneState(origin = preferences.getString("server_origin", "").orEmpty(), bypassTls = preferences.getBoolean("bypass_tls", false)))
+    private val mutable = MutableStateFlow(PhoneState(origin = preferences.getString("server_origin", "").orEmpty(), bypassTls = preferences.getBoolean("bypass_tls", false), trustedCa = preferences.getString("trusted_ca", null)))
     val state = mutable.asStateFlow()
     private var client: ServerClient? = null
     private var action: Job? = null
@@ -76,7 +76,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
     /** Revalidate saved credentials with the server; protected profiles still require their PIN. */
     fun reconnect() = perform {
         val origin = serverOrigin(state.value.origin) ?: return@perform
-        val api = client ?: ServerClient(origin, sessionStore, state.value.bypassTls).also { client = it }
+        val api = client ?: ServerClient(origin, sessionStore, state.value.bypassTls, state.value.trustedCa).also { client = it }
         if (!api.hasSession()) return@perform
         val status = JSONObject(api.request("/api/auth/status"))
         if (!status.optBoolean("authenticated")) { expireSession(); return@perform }
@@ -96,7 +96,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         stopWatching()
         client?.clearSession(); client = null
         preferences.edit().remove("profile_id").apply()
-        update { PhoneState(origin = it.origin, bypassTls = it.bypassTls) }
+        update { PhoneState(origin = it.origin, bypassTls = it.bypassTls, trustedCa = it.trustedCa) }
     }
 
     fun login(rawOrigin: String, username: String, password: String, bypassTls: Boolean = false) = perform {
@@ -108,10 +108,26 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
             JSONObject().put("username", username).put("password", password)))
         if (!status.optBoolean("authenticated")) throw IOException("Sign-in was not accepted.")
         client = api
-        preferences.edit().putString("server_origin", origin).putBoolean("bypass_tls", bypassTls).commit()
-        update { it.copy(origin = origin, bypassTls = bypassTls) }
+        preferences.edit().putString("server_origin", origin).putBoolean("bypass_tls", bypassTls).remove("trusted_ca").commit()
+        update { it.copy(origin = origin, bypassTls = bypassTls, trustedCa = null) }
         readAccount(JSONObject(api.request("/api/auth/status")))
         if (state.value.mustChangePassword) return@perform
+        val profiles = api.profiles()
+        update { it.copy(profiles = profiles) }
+    }
+
+    /** The TV confirms an instance CA before sending its PIN or saving a session. */
+    fun pairTV(origin: String, pin: String, trustedCa: String) = perform {
+        val normalized = serverOrigin(origin) ?: throw IOException("Invalid local server address.")
+        client?.clearSession()
+        val api = ServerClient(normalized, sessionStore, trustedCa = trustedCa)
+        val status = JSONObject(api.request("/api/auth/tv-login", "POST", JSONObject().put("pin", pin)))
+        if (!status.optBoolean("authenticated")) throw IOException("TV PIN was not accepted.")
+        client = api
+        preferences.edit().putString("server_origin", normalized).putBoolean("bypass_tls", false)
+            .putString("trusted_ca", trustedCa).commit()
+        update { it.copy(origin = normalized, bypassTls = false, trustedCa = trustedCa) }
+        readAccount(status)
         val profiles = api.profiles()
         update { it.copy(profiles = profiles) }
     }
@@ -339,7 +355,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
                             mediaFileId = tune.optLong("mediaFileId", -1), sourceHeight = tune.optInt("sourceHeight", 720),
                             audioTracks = phoneTracks(tune.optJSONArray("audioTracks")), subtitleTracks = phoneTracks(tune.optJSONArray("subtitles")),
                             streamOffsetSeconds = if (direct) 0.0 else tune.optDouble("streamOffsetSeconds"),
-                            bypassTls = state.value.bypassTls, hlsOriginMs = tune.optString("hlsOrigin").takeIf { it.isNotBlank() }?.let { Instant.parse(it).toEpochMilli() })
+                            bypassTls = state.value.bypassTls, trustedCa = state.value.trustedCa, hlsOriginMs = tune.optString("hlsOrigin").takeIf { it.isNotBlank() }?.let { Instant.parse(it).toEpochMilli() })
                         update { it.copy(playback = media, profile = it.profile?.copy(lastChannel = channel.id),
                             subtitleIndex = selectedSubtitle(media, profile),
                             subtitleFileId = media.mediaFileId) }
