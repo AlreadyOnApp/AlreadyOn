@@ -1,3 +1,4 @@
+# Go extraction requires a real build; JavaScript and TypeScript use source analysis.
 name: CodeQL
 on:
   push:
@@ -18,13 +19,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [go, javascript-typescript]
+        include:
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/setup-go@v7
+        if: matrix.language == 'go'
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
       - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
+          build-mode: ${{ matrix.build-mode }}
+      - name: Build Go source for analysis
+        if: matrix.language == 'go'
+        working-directory: server
+        run: go build ./...
       - uses: github/codeql-action/analyze@v4

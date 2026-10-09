@@ -33,3 +33,5 @@ Hosted workflows are optional execution infrastructure, not permission to skip c
 Pushes and pull requests validate source with read-only credentials; maintainers merge manually. CodeQL scans Go and TypeScript. Pages publishes a minimal documentation landing page from `main`. Image builds and promotions remain manually dispatched after approval.
 
 The Go module and Android application ID retain their established identities for compatibility. New image references use `ghcr.io/alreadyonapp/alreadyon`; migrate existing deployments only after a new image is available.
+
+Hosted Go regression tests install FFmpeg for synthetic media checks. CodeQL builds the Go server explicitly; TypeScript analysis does not require a build. Registry image names use lowercase even when the repository display name uses capitals. Workflow changes must include a relevant documentation update.
