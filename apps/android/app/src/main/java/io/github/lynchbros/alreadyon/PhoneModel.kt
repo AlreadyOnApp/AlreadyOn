@@ -48,6 +48,8 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
     private var viewing: Job? = null
     private var guideEntry: Job? = null
     private var serial = 0L
+    private var subtitleOverride = false
+    private var preferredSubtitle: PhoneTrack? = null
     private var capabilities: JSONObject? = null
     private var capabilityTime = 0L
 
@@ -221,6 +223,8 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun restoreChannel(profile: ViewerProfile, channels: List<GuideChannel>) {
+        subtitleOverride = false
+        preferredSubtitle = null
         update { it.copy(muted = true, paused = false, audioIndex = null, audioFileId = null, subtitleIndex = null, subtitleFileId = null) }
         (channels.find { it.id == profile.lastChannel && it.programs.isNotEmpty() }
             ?: channels.firstOrNull { it.programs.isNotEmpty() })?.let(::watch)
@@ -233,7 +237,33 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         update { it.copy(audioIndex = track.index, audioFileId = it.playback?.mediaFileId) }
         state.value.channel?.let(::watch)
     }
-    fun setSubtitle(index: Int?) = update { it.copy(subtitleIndex = index, subtitleFileId = it.playback?.mediaFileId) }
+    fun setSubtitle(index: Int?) {
+        subtitleOverride = true
+        preferredSubtitle = state.value.playback?.subtitleTracks?.find { it.index == index }
+        update { it.copy(subtitleIndex = index, subtitleFileId = it.playback?.mediaFileId) }
+    }
+
+    /** Numeric neighbours in the available guide; never wrap or alter presentation/settings. */
+    fun stepChannel(direction: Int) {
+        val current = state.value.channel ?: return
+        val available = state.value.channels.filter { it.programs.isNotEmpty() }
+        val next = if (direction > 0) available.filter { it.number > current.number }.minByOrNull { it.number }
+            else available.filter { it.number < current.number }.maxByOrNull { it.number }
+        next?.let(::watch)
+    }
+
+    private fun selectedSubtitle(media: PhonePlayback, profile: ViewerProfile): Int? {
+        if (state.value.subtitleFileId == media.mediaFileId) return state.value.subtitleIndex
+        if (subtitleOverride) {
+            val preferred = preferredSubtitle ?: return null // Explicit Off survives new media.
+            // Track indices belong to a file. Match the choice, then its language on the new file.
+            return (media.subtitleTracks.find { it.label == preferred.label }
+                ?: media.subtitleTracks.find { it.language == preferred.language && it.language != "und" })?.index
+        }
+        return if (profile.subtitles) media.subtitleTracks.firstOrNull {
+            it.language == profile.subtitleLanguage || it.language == subtitleISO3(profile.subtitleLanguage)
+        }?.index else null
+    }
 
     fun refreshGuide() = perform {
         val profile = state.value.profile ?: return@perform
@@ -311,8 +341,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
                             streamOffsetSeconds = if (direct) 0.0 else tune.optDouble("streamOffsetSeconds"),
                             bypassTls = state.value.bypassTls, hlsOriginMs = tune.optString("hlsOrigin").takeIf { it.isNotBlank() }?.let { Instant.parse(it).toEpochMilli() })
                         update { it.copy(playback = media, profile = it.profile?.copy(lastChannel = channel.id),
-                            subtitleIndex = if (it.subtitleFileId == media.mediaFileId) it.subtitleIndex else if (profile.subtitles)
-                                media.subtitleTracks.firstOrNull { t -> t.language == profile.subtitleLanguage || t.language == subtitleISO3(profile.subtitleLanguage) }?.index else null,
+                            subtitleIndex = selectedSubtitle(media, profile),
                             subtitleFileId = media.mediaFileId) }
                         val boundary = SystemClock.elapsedRealtime() + remainingMs
                         while (SystemClock.elapsedRealtime() < boundary) {
