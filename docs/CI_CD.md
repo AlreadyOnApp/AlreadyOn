@@ -35,3 +35,5 @@ Pushes and pull requests validate source with read-only credentials; maintainers
 The Go module and Android application ID retain their established identities for compatibility. New image references use `ghcr.io/alreadyonapp/alreadyon`; migrate existing deployments only after a new image is available.
 
 Hosted Go regression tests install FFmpeg for synthetic media checks. CodeQL builds the Go server explicitly; TypeScript analysis does not require a build. Registry image names use lowercase even when the repository display name uses capitals. Workflow changes must include a relevant documentation update.
+
+To refresh published bases, dispatch **Refresh Base Images** on the approved branch. It rebuilds `ghcr.io/alreadyonapp/alreadyon-base:base-runtime` and `:base-ci`. The CI base pins the runtime digest; hosted application builds resolve and pass both base digests to the Dockerfile. Dockerfile defaults and local registry fallback use the same organization.
