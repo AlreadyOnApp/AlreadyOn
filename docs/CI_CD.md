@@ -30,10 +30,10 @@ Hosted workflows preserve approval gates. Consult [image retention](IMAGE_RETENT
 
 ## Public automation
 
-Pushes and pull requests validate source with read-only credentials; maintainers merge manually. CodeQL scans Go and TypeScript. Pages publishes a minimal documentation landing page from `main`. Image builds and promotions remain manually dispatched after approval.
+Pushes and pull requests validate source with read-only credentials; maintainers merge. CodeQL scans Go and TypeScript. Pages publishes a documentation landing page from `main`. Container image builds and promotions remain manually dispatched after approval. [Android APK releases](ANDROID_RELEASES.md) publish candidates on Android changes pushed to `main`; stable APK promotion is an explicit manual dispatch that reuses tested candidate assets.
 
 The Go module and Android application ID retain their established identities for compatibility. New image references use `ghcr.io/alreadyonapp/alreadyon`; migrate existing deployments only after a new image is available.
 
-Hosted Go regression tests install FFmpeg for synthetic media checks. CodeQL builds the Go server explicitly; TypeScript analysis does not require a build. Registry image names use lowercase even when the repository display name uses capitals. Document workflow changes.
+Hosted Go tests install FFmpeg for synthetic checks. CodeQL builds Go explicitly. Registry image names use lowercase. Document workflow changes.
 
 To refresh published bases, dispatch **Refresh Base Images** on the approved branch. It rebuilds `ghcr.io/alreadyonapp/alreadyon-base:base-runtime` and `:base-ci`. The CI base pins the runtime digest; hosted application builds resolve and pass both base digests to the Dockerfile. Dockerfile defaults and local registry fallback use the same organization.
