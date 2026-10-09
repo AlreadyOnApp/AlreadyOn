@@ -1,0 +1,30 @@
+---
+name: alreadyon
+
+services:
+  alreadyon:
+    # Published production channel; use nightly or latest for dev/test.
+    image: ghcr.io/alreadyonapp/alreadyon:stable
+    container_name: alreadyon
+    restart: unless-stopped
+    ports:
+      - '19900:19900'
+      # Forward WAN TCP/80 to this host port for Let's Encrypt HTTP-01.
+      - '19902:19902'
+    devices:
+      - /dev/dri:/dev/dri
+    # Optional for hardware transcoding when running as a non-root `user:`.
+    # Find host device GIDs with: stat -c '%g %n' /dev/dri/*
+    # Replace these IDs as needed; omit this block and `devices` for CPU-only use.
+    group_add:
+      - '44'
+      # Add the host's render-device group ID when required.
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./:/config
+      - /srv/media:/data/media:ro
+    tmpfs:
+      - /config/transcode:size=8g,uid=1000,gid=1000,mode=0700

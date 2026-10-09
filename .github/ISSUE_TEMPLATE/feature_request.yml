@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a new feature or enhancement for AlreadyOn
+title: 'feat: '
+labels:
+  - type:task
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What's the user or engineering outcome?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How would we know this is done?
+    validations:
+      required: false
+
+  - type: input
+    id: epic
+    attributes:
+      label: Related Epic (if known)
+      placeholder: '#12'
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

@@ -1,0 +1,6 @@
+//go:build !e2e
+
+package main
+
+// Production always runs hourly maintenance; this is not a runtime setting.
+const periodicJobsEnabled = true

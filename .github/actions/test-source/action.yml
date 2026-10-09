@@ -1,0 +1,29 @@
+# Run source tests in the prebuilt CI base; test results are never cached.
+name: Test application source
+description: Run Go and Chromium suites against the selected CI base image
+inputs:
+  ci-base:
+    description: Immutable CI base image reference
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Pull the selected CI base
+      shell: bash
+      run: docker pull '${{ inputs.ci-base }}'
+    - name: Go tests and Chromium playback tests
+      env:
+        TEST_MEMORY: 5g
+        TEST_TMPFS: 2g
+      shell: bash
+      run: |
+        docker run --rm --name "alreadyon-ci-tests-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+          --memory="$TEST_MEMORY" --tmpfs "/tmp:rw,exec,size=$TEST_TMPFS,mode=1777" --user "$(id -u):$(id -g)" \
+          -e GOFLAGS=-p=1 -e HOME=/tmp -e TZ \
+          -v "$GITHUB_WORKSPACE:/workspaces/alreadyon" \
+          '${{ inputs.ci-base }}' bash -euc \
+          'npm ci --prefix web; go clean -testcache; make test; make test-e2e'
+    - name: Clean up the test container after cancellation
+      if: always()
+      shell: bash
+      run: docker rm -f "alreadyon-ci-tests-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >/dev/null 2>&1 || true

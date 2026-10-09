@@ -1,0 +1,104 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+/* Theme-aware scrollbars for pages, dialogs and nested scroll regions. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted, #858b98) var(--surface, #20232b);
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: var(--surface, #20232b); border-radius: 8px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--text-muted, #858b98);
+  border: 2px solid var(--surface, #20232b);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text, #dfe3ea); }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+*::-webkit-scrollbar-corner { background: var(--surface, #20232b); }
+
+/* The guide remains scrollable without visible bars, including page overflow. */
+html:has(.guide-page), body:has(.guide-page), .guide-page, .guide-page *, .no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html:has(.guide-page)::-webkit-scrollbar,
+body:has(.guide-page)::-webkit-scrollbar,
+.guide-page::-webkit-scrollbar,
+.guide-page *::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+:root {
+  --font-scale: 1;
+  --page-brightness: 1;
+}
+
+html {
+  background: var(--bg, #12141a);
+  color: var(--text, #dfe3ea);
+  font-family: var(--body-font, system-ui, sans-serif);
+  letter-spacing: var(--letter-spacing, normal);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Global brightness dimmer (TEMPORARY, evaluation feedback). This used to
+   be `filter: brightness()` on #root, but a `filter` on any ancestor —
+   even a no-op `brightness(1)` — creates a new containing block that
+   breaks `position: sticky` for every descendant (this was the actual
+   cause of the Guide page's whole family of sticky channel-column/header
+   bugs, present since the very first commit that added this dimmer,
+   independent of column count or scroll width). A fixed black overlay
+   with matching opacity produces the identical visual result (each
+   BRIGHTNESS_LEVELS value is <=1, so `1 - value` alpha-blends to the same
+   result as multiplying every channel by `value`) without touching any
+   element's containing block. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: calc(1 - var(--page-brightness, 1));
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Underline links so color is not their only identifying cue. Keep visited
+   links the same color for consistent contrast on the dark surface. */
+a {
+  color: var(--link-color, var(--accent));
+  text-decoration: underline;
+}
+
+a:visited {
+  color: var(--link-color, var(--accent));
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--heading-font, inherit);
+  color: var(--heading-color, inherit);
+  text-transform: var(--heading-transform, none);
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}

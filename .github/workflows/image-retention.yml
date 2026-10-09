@@ -1,0 +1,53 @@
+# Daily cleanup uses trusted dev code; PR closure itself triggers nothing.
+name: Daily Clean Images and Cache
+on:
+  schedule:
+    - cron: '43 7 * * *'
+      timezone: America/New_York
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Delete the versions shown in the retention plan
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  packages: write
+  pull-requests: read
+  actions: write
+concurrency:
+  group: application-images
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    concurrency:
+      group: base-images
+      cancel-in-progress: false
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply retention (manual dispatch defaults to dry run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLY: ${{ github.event_name != 'workflow_dispatch' || inputs.apply }}
+        run: |
+          args=()
+          if [ "$APPLY" = true ]; then args+=(--apply); fi
+          python3 scripts/ci/clean-images.py "${args[@]}"
+      - name: Clean closed-PR caches and superseded bases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLY: ${{ github.event_name != 'workflow_dispatch' || inputs.apply }}
+        run: |
+          args=()
+          if [ "$APPLY" = true ]; then args+=(--apply); fi
+          python3 scripts/ci/clean-build-storage.py "${args[@]}"

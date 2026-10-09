@@ -1,0 +1,54 @@
+# A promotion merge retags an image that already passed the PR gate; nothing is rebuilt or retested here.
+name: OnDemand Promote Release Image
+on:
+  # Publication is manual after deployment validation; no push/scheduled release.
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  TZ: America/New_York
+jobs:
+  promote:
+    if: ${{ contains(fromJSON('["test","main"]'), github.ref_name) }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    # A slower older promotion must not overwrite a newer channel tag.
+    concurrency:
+      group: application-images
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify the promotion and that its branch is still current
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/branch-policy.py --delivery
+      - name: Select the promotion channel without changing the build date
+        id: tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_SELECTED_SHA: ${{ steps.policy.outputs.selected }}
+        run: python3 scripts/ci/image-tags.py >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add the channel tags to the already tested image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_REVISION: ${{ github.sha }}
+          IMAGE_TAGS: ${{ steps.tags.outputs.tags }}
+          SOURCE_IMAGE: ${{ steps.tags.outputs.source }}
+        run: |
+          docker buildx imagetools inspect "$SOURCE_IMAGE" >/dev/null ||
+            { echo "::error::No tested image $SOURCE_IMAGE; only commits merged through the PR pipeline can be promoted."; exit 1; }
+          python3 scripts/ci/publish-image.py
+          echo "Published \`$IMAGE_TAGS\` from tested \`$SOURCE_IMAGE\`" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,47 @@
+# Web
+web/node_modules/
+web/dist/
+web/dist-ssr/
+
+# Go
+server/alreadyon-server
+server/data/
+*.exe
+*.test
+
+# Local runtime data/config (never commit real media, DBs, or secrets)
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.local
+data/
+media-fixtures/local/
+tests/fixtures/generated/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Python
+__pycache__/
+
+# Private maintainer notes and publication-review archives
+.private/
+
+# Database sidecars and local test reports
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+test-results/
+playwright-report/
+
+# Android workstation paths, build output and signing material
+**/local.properties
+**/.gradle/
+apps/android/**/build/
+*.apk
+*.aab
+*.jks
+*.keystore

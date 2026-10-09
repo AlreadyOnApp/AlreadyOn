@@ -1,0 +1,3 @@
+# Store launcher text canonically while keeping Windows checkout line endings.
+gradlew text eol=lf
+gradlew.bat text eol=crlf

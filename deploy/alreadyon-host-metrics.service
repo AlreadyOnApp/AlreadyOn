@@ -1,0 +1,21 @@
+[Unit]
+Description=AlreadyOn host resource sampler
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/alreadyon-host-metrics --output /opt/apps/alreadyon/host-metrics.json
+Restart=on-failure
+RestartSec=5
+User=1000
+Group=1000
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/apps/alreadyon
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

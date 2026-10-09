@@ -1,0 +1,21 @@
+/* Modern Minimal Dark is the sole application palette, including sign-in. */
+:root {
+  --bg: #12141a;
+  --surface: #1a1d26;
+  --surface-alt: #21252f;
+  --text: #dfe3ea;
+  --text-muted: #8b93a3;
+  --heading-color: #ffffff;
+  --heading-font: system-ui, sans-serif;
+  --heading-transform: none;
+  --letter-spacing: normal;
+  --body-font: system-ui, sans-serif;
+  --accent: #3a6ae0;
+  --accent-text: #ffffff;
+  --link-color: #5b8cff;
+  --border: #2b303c;
+  --radius: 10px;
+  --now-highlight: #33406b;
+  --now-highlight-text: #ffffff;
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}

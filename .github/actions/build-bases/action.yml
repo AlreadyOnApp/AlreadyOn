@@ -1,0 +1,124 @@
+# Resolve or publish prerequisites before application builds. Callers serialize
+# through base-images; downstream jobs receive immutable references.
+name: Resolve shared base images
+description: Reuse matching recipes or bootstrap missing runtime and CI bases
+inputs:
+  image:
+    description: GHCR base package without a tag
+    required: true
+  revision:
+    description: Source revision
+    required: true
+  refresh:
+    description: Weekly upstream security refresh
+    default: 'false'
+  allow-build:
+    description: Fork PRs may resolve but must not publish
+    default: 'true'
+outputs:
+  ci:
+    description: Immutable CI image
+    value: ${{ steps.ci-final.outputs.reference }}
+  runtime:
+    description: Immutable runtime image
+    value: ${{ steps.runtime-final.outputs.reference }}
+runs:
+  using: composite
+  steps:
+    - uses: docker/setup-buildx-action@v4
+      with:
+        name: alreadyon-bases-${{ github.run_id }}
+        driver-opts: |
+          memory=5g
+          cpu-period=100000
+          cpu-quota=200000
+        buildkitd-config-inline: |
+          [worker.oci]
+            max-parallelism = 2
+    - id: runtime
+      shell: bash
+      env:
+        BASE_IMAGE: ${{ inputs.image }}
+        REFRESH: ${{ inputs.refresh }}
+      run: |
+        args=()
+        if [ "$REFRESH" = true ]; then args+=(--refresh); fi
+        python3 scripts/ci/resolve-base.py "$BASE_IMAGE" runtime "${args[@]}"
+    - name: Make room when prerequisites need rebuilding
+      if: steps.runtime.outputs.needed == 'true' && inputs.allow-build == 'true'
+      shell: bash
+      run: |
+        test "$RUNNER_ENVIRONMENT" = github-hosted
+        sudo -n rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup
+    - name: Build runtime only when needed
+      if: steps.runtime.outputs.needed == 'true' && inputs.allow-build == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: deploy/base.Dockerfile
+        target: runtime-base
+        platforms: linux/amd64
+        pull: true
+        no-cache: ${{ inputs.refresh }}
+        push: true
+        tags: ${{ inputs.image }}:base-runtime
+        labels: |
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.revision=${{ inputs.revision }}
+          io.alreadyon.base.recipe=${{ steps.runtime.outputs.key }}
+    - id: runtime-final
+      shell: bash
+      env:
+        BASE_IMAGE: ${{ inputs.image }}
+      run: |
+        python3 scripts/ci/resolve-base.py "$BASE_IMAGE" runtime
+    - id: ci
+      shell: bash
+      env:
+        BASE_IMAGE: ${{ inputs.image }}
+        RUNTIME_BASE: ${{ steps.runtime-final.outputs.reference }}
+        REFRESH: ${{ inputs.refresh }}
+      run: |
+        args=()
+        if [ "$REFRESH" = true ]; then args+=(--refresh); fi
+        python3 scripts/ci/resolve-base.py "$BASE_IMAGE" ci --runtime "$RUNTIME_BASE" "${args[@]}"
+    - name: Make room for changed browser/toolchain prerequisites
+      if: steps.ci.outputs.needed == 'true' && steps.runtime.outputs.needed != 'true' && inputs.allow-build == 'true'
+      shell: bash
+      run: |
+        test "$RUNNER_ENVIRONMENT" = github-hosted
+        sudo -n rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup
+    - name: Build CI tooling on the published runtime
+      if: steps.ci.outputs.needed == 'true' && inputs.allow-build == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: deploy/ci-base.Dockerfile
+        target: ci-base
+        platforms: linux/amd64
+        pull: true
+        no-cache: ${{ inputs.refresh }}
+        push: true
+        tags: ${{ inputs.image }}:base-ci
+        build-args: |
+          RUNTIME_BASE=${{ steps.runtime-final.outputs.reference }}
+        labels: |
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.revision=${{ inputs.revision }}
+          io.alreadyon.base.recipe=${{ steps.ci.outputs.key }}
+          io.alreadyon.base.runtime=${{ steps.runtime-final.outputs.reference }}
+    - id: ci-final
+      shell: bash
+      env:
+        BASE_IMAGE: ${{ inputs.image }}
+        RUNTIME_BASE: ${{ steps.runtime-final.outputs.reference }}
+      run: |
+        python3 scripts/ci/resolve-base.py "$BASE_IMAGE" ci --runtime "$RUNTIME_BASE"
+    - name: Refuse missing or mismatched recipes (including fork PRs)
+      shell: bash
+      env:
+        RUNTIME_NEEDED: ${{ steps.runtime-final.outputs.needed }}
+        CI_NEEDED: ${{ steps.ci-final.outputs.needed }}
+      run: |
+        test "$RUNTIME_NEEDED" = false
+        test "$CI_NEEDED" = false

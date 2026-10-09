@@ -1,0 +1,129 @@
+/* Shown before any theme is applied, so every colour has a fallback. */
+.auth-gate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.auth-dialog {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px 28px;
+  color: var(--text, #dfe3ea);
+  background: var(--surface, #1a1d26);
+  border: 1px solid var(--border, #2b303c);
+  border-radius: var(--radius, 10px);
+  box-shadow: var(--shadow, 0 8px 20px rgba(0, 0, 0, 0.35));
+}
+
+.auth-dialog h1 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+}
+
+.auth-dialog label {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: var(--text-muted, #8b93a3);
+}
+
+.auth-dialog input {
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg, #12141a);
+  border: 1px solid var(--border, #2b303c);
+  border-radius: 6px;
+}
+
+.auth-dialog .password-input-wrap {
+  width: 100%;
+}
+
+.auth-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted, #8b93a3);
+}
+
+.auth-error {
+  margin: 4px 0 0;
+  color: #ff8a80;
+}
+
+.auth-submit {
+  margin-top: 12px;
+  padding: 9px 16px;
+  font: inherit;
+  color: var(--accent-text, #ffffff);
+  background: var(--accent, #3a6ae0);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.auth-link {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--link-color, #5b8cff);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.auth-forgot {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  color: var(--text-muted, #8b93a3);
+}
+
+.auth-forgot p {
+  margin: 8px 0 4px;
+}
+
+.auth-forgot code {
+  display: block;
+  padding: 6px 8px;
+  font-family: ui-monospace, monospace;
+  color: var(--text, #dfe3ea);
+  background: var(--bg, #12141a);
+  border: 1px solid var(--border, #2b303c);
+  border-radius: 6px;
+  user-select: all;
+}
+
+.auth-forgot p code {
+  display: inline;
+  padding: 1px 4px;
+}
+
+@media (max-width: 480px) {
+  .auth-gate {
+    min-height: 100dvh;
+    padding: 16px;
+  }
+
+  .auth-dialog {
+    padding: 20px;
+  }
+
+  .auth-submit,
+  .auth-link {
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Initial phone connection screen; authentication is a subsequent increment. -->
+<resources>
+    <string name="app_name">AlreadyOn</string>
+    <string name="server_heading">Your AlreadyOn server</string>
+    <string name="server_help">Enter the HTTPS address you use to reach your server from this phone.</string>
+    <string name="server_address">Server address</string>
+    <string name="save_server">Save server</string>
+    <string name="invalid_server">Enter an HTTPS hostname and optional port, without a path, password, query or fragment.</string>
+    <string name="loopback_server">Use your server’s network hostname. Localhost points to this phone.</string>
+    <string name="saved_server">Server address saved. Sign-in and playback are coming next.</string>
+</resources>

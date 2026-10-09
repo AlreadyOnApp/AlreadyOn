@@ -1,0 +1,100 @@
+.startup-notice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--text);
+  font-family: var(--body-font);
+}
+
+.startup-notice-title {
+  font-family: var(--heading-font);
+  /* Not --heading-color: Cartoons and WebTV's heading colors fall below 4.5:1 on --surface. */
+  color: var(--text);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--letter-spacing);
+  font-size: calc(22px * var(--font-scale));
+  line-height: 1.2;
+}
+
+.startup-notice-detail {
+  margin-top: 6px;
+  font-size: calc(16px * var(--font-scale));
+}
+
+.startup-notice-hint {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: calc(14px * var(--font-scale));
+}
+
+/* Fills the guide section (which is position: relative) on first run. */
+.startup-notice-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  justify-content: center;
+  background: var(--surface);
+  padding: 24px;
+  text-align: left;
+}
+
+.startup-notice-panel .startup-notice-text {
+  max-width: 560px;
+}
+
+.startup-notice-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.startup-notice-banner .startup-notice-title {
+  font-size: calc(15px * var(--font-scale));
+}
+
+.startup-notice-banner .startup-notice-detail {
+  margin-top: 2px;
+  font-size: calc(14px * var(--font-scale));
+}
+
+.startup-notice-banner .startup-notice-hint {
+  margin-top: 4px;
+}
+
+.startup-notice-failed.startup-notice-banner,
+.startup-notice-noRoots.startup-notice-banner {
+  border-left-color: var(--now-highlight);
+}
+
+.startup-spinner {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: startup-spin 1s linear infinite;
+}
+
+.startup-notice-banner .startup-spinner {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+@keyframes startup-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-spinner {
+    animation: none;
+    border-top-color: var(--border);
+    border-right-color: var(--accent);
+  }
+}
