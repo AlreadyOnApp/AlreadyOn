@@ -66,7 +66,7 @@ jobs:
       - uses: ./.github/actions/build-bases
         id: resolve
         with:
-          image: ghcr.io/${{ github.repository }}-base
+          image: ghcr.io/alreadyonapp/alreadyon-base
           revision: ${{ needs.select.outputs.revision }}
   tests:
     name: Go and full browser e2e tests
