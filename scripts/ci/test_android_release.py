@@ -14,8 +14,24 @@ SPEC.loader.exec_module(release)
 class AndroidReleaseTests(unittest.TestCase):
     def fixture(self, directory):
         (directory / release.ASSETS[0]).write_bytes(b"synthetic signed APK")
+        (directory / release.ASSETS[3]).write_bytes(b"synthetic signed TV APK")
         with patch.object(release, "publish"):
             release.candidate("owner/repo", "2026-10-09-rc2", "a" * 40, 200000000, directory)
+
+    def test_download_includes_both_apks_and_provenance(self):
+        with patch.object(release, "run") as command:
+            release.download("owner/repo", "2026-10-09-rc1", Path("assets"))
+            arguments = command.call_args.args
+            for asset in release.ASSETS:
+                self.assertIn(asset, arguments)
+
+    def test_tv_checksum_detects_changed_apk(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            self.fixture(directory)
+            (directory / release.ASSETS[3]).write_bytes(b"different TV APK")
+            with self.assertRaisesRegex(ValueError, "TV APK checksum"):
+                release.verify_assets(directory)
 
     def test_candidate_numbers_include_existing_tags_and_drafts(self):
         self.assertEqual(release.next_tag("2026-10-09", []), "2026-10-09-rc1")

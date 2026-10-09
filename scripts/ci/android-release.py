@@ -13,7 +13,7 @@ import time
 from zoneinfo import ZoneInfo
 
 RC = re.compile(r"(\d{4}-\d{2}-\d{2})-rc([1-9]\d*)\Z")
-ASSETS = ("alreadyon-android.apk", "SHA256SUMS", "android-release.json")
+ASSETS = ("alreadyon-android.apk", "SHA256SUMS", "android-release.json", "alreadyon-tv.apk")
 
 
 def run(*args):
@@ -51,9 +51,11 @@ def verify_assets(directory, source=None):
     expected = digest(directory / ASSETS[0])
     if manifest.get("apk_sha256") != expected:
         raise ValueError("APK checksum does not match release provenance")
+    if manifest.get("tv_apk_sha256") != digest(directory / ASSETS[3]):
+        raise ValueError("TV APK checksum does not match release provenance")
     sums = (directory / "SHA256SUMS").read_text()
     required = "".join(f"{digest(directory / name)}  {name}\n"
-                       for name in (ASSETS[0], ASSETS[2]))
+                       for name in (ASSETS[0], ASSETS[2], ASSETS[3]))
     if sums != required:
         raise ValueError("Release checksum file does not match the assets")
     return manifest
@@ -61,7 +63,7 @@ def verify_assets(directory, source=None):
 
 def download(repo, tag, directory):
     run("gh", "release", "download", tag, "--repo", repo, "--dir", str(directory),
-        "--pattern", ASSETS[0], "--pattern", ASSETS[1], "--pattern", ASSETS[2])
+        *(argument for name in ASSETS for argument in ("--pattern", name)))
 
 
 def publish(repo, tag, sha, directory, notes, prerelease):
@@ -139,16 +141,17 @@ def candidate(repo, tag, sha, code, directory):
         raise ValueError("Invalid Android release version")
     manifest = {"source_sha": sha, "version_name": tag, "version_code": code,
                 "package": "io.github.lynchbros.alreadyon",
-                "apk_sha256": digest(directory / ASSETS[0])}
+                "apk_sha256": digest(directory / ASSETS[0]),
+                "tv_apk_sha256": digest(directory / ASSETS[3])}
     (directory / ASSETS[2]).write_text(json.dumps(manifest, indent=2) + "\n")
     (directory / ASSETS[1]).write_text("".join(
-        f"{digest(directory / name)}  {name}\n" for name in (ASSETS[0], ASSETS[2])))
+        f"{digest(directory / name)}  {name}\n" for name in (ASSETS[0], ASSETS[2], ASSETS[3])))
     verify_assets(directory, sha)
-    notes = (f"Android phone/tablet release candidate `{tag}`.\n\n"
+    notes = (f"Android mobile and Google TV release candidate `{tag}`.\n\n"
              f"Source commit: `{sha}`\n\nAndroid versionCode: `{code}`\n\n"
              "Signed release package: `io.github.lynchbros.alreadyon`. "
              "The developer `.debug` app remains a separate installation.\n\n"
-             "Test on devices before stable promotion. Google TV is not supported by this build. "
+             "Test mobile and Google TV builds on devices before stable promotion. "
              "Checksums and source provenance are attached.\n")
     publish(repo, tag, sha, directory, notes, True)
 
@@ -170,7 +173,7 @@ def promote(repo, tag):
         if manifest["version_name"] != tag:
             raise ValueError("Candidate manifest version does not match the selected tag")
         stable = f"{match[1]}-stable"
-        notes = (f"Stable Android phone/tablet release promoted from `{tag}`.\n\n"
+        notes = (f"Stable Android mobile and Google TV release promoted from `{tag}`.\n\n"
                  f"Source commit: `{sha}`\n\n"
                  "Assets are byte-for-byte copies of the tested candidate; nothing was rebuilt "
                  "or re-signed. The APK's embedded version name remains the candidate version.\n")

@@ -8,6 +8,8 @@
 
 Browser sessions use cookies. Management API keys carry owner-level authority. Playback credentials are scoped to media delivery and must not be treated as management keys. Enforce account/profile ownership on every protected operation.
 
+TV pairing adds local HTTPS discovery/trust metadata, PIN login and per-account PIN management. PIN login creates the same account session used by other clients; it does not bypass profile ownership, disabled accounts, password-change restrictions or stream limits. PINs must be unique within an instance. See [Google TV](../docs/GOOGLE_TV.md).
+
 ## Playback
 
 Use the tune endpoint to obtain an authorized session, then follow playback status, lease and timing fields. Honor retry hints and server time; do not construct media URLs or assume codec support. Expired credentials require a fresh authorized flow.

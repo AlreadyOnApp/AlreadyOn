@@ -72,10 +72,13 @@ const MaxAPIBodyBytes = 8 << 20
 // they are how a browser learns the sign-in state, creates the first account
 // and signs in or out.
 var publicRoutes = map[string]bool{
-	"GET /api/auth/status":  true,
-	"POST /api/auth/setup":  true,
-	"POST /api/auth/login":  true,
-	"POST /api/auth/logout": true,
+	"GET /api/tv/server":      true,
+	"GET /api/tv/trust":       true,
+	"POST /api/auth/tv-login": true,
+	"GET /api/auth/status":    true,
+	"POST /api/auth/setup":    true,
+	"POST /api/auth/login":    true,
+	"POST /api/auth/logout":   true,
 }
 
 // RequireAuth requires a browser session cookie or an API key bearer token for

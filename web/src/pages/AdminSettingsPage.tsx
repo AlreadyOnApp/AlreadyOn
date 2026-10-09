@@ -6,6 +6,7 @@ import Brand from '../components/Brand';
 import { useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import UsersPage from './admin/UsersPage';
+import TvPairingCard from './admin/TvPairingCard';
 import { useUsers } from '../users/UsersContext';
 import './AdminPage.css';
 
@@ -29,6 +30,7 @@ export default function AdminSettingsPage() {
             ← Back To Guide
           </button>
         </div>
+        <TvPairingCard />
         <UsersPage />
       </div>
     </div>

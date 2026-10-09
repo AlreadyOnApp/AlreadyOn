@@ -278,3 +278,6 @@
 
 /* Self-service back navigation sits below branding, above the first settings card. */
 .settings-back-row { display: flex; justify-content: flex-start; margin-bottom: 20px; }
+
+.tv-pairing-form { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.tv-pairing-form input { background: var(--bg, #101318); color: inherit; border: 1px solid #303743; border-radius: 8px; padding: 8px 12px; }

@@ -23,6 +23,7 @@ import (
 	"github.com/lynchbros/alreadyon/server/internal/httpapi"
 	"github.com/lynchbros/alreadyon/server/internal/instancetls"
 	"github.com/lynchbros/alreadyon/server/internal/keyframes"
+	"github.com/lynchbros/alreadyon/server/internal/landiscovery"
 	"github.com/lynchbros/alreadyon/server/internal/library"
 	"github.com/lynchbros/alreadyon/server/internal/lineup"
 	"github.com/lynchbros/alreadyon/server/internal/logging"
@@ -303,6 +304,13 @@ func run() (restart bool) {
 			logging.Fatal("server: %v", err)
 		}
 	}()
+
+	// Discovery failure must not stop an otherwise healthy HTTPS server.
+	if stop, err := landiscovery.Advertise(listenerAddress(cfg.ManagementAddr)); err != nil {
+		logging.Warn("LAN discovery unavailable: %v", err)
+	} else {
+		defer stop()
+	}
 
 	// The library pipeline can take minutes on a real library, so it runs
 	// after the listener is up rather than delaying it (#107).

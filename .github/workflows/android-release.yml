@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'apps/android/app/src/**'
+      - 'apps/android/tv/src/main/**'
       - 'apps/android/**/*.gradle.kts'
       - 'apps/android/gradle.properties'
       - 'apps/android/gradle/**'
@@ -77,7 +78,7 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.tag }}
           VERSION_CODE: ${{ steps.version.outputs.version_code }}
         run: |
-          apps/android/gradlew -p apps/android --no-daemon :app:assembleRelease \
+          apps/android/gradlew -p apps/android --no-daemon :app:assembleRelease :tv:assembleRelease \
             "-PandroidVersionName=$VERSION_NAME" "-PandroidVersionCode=$VERSION_CODE"
       - name: Sign and verify release APK
         if: steps.version.outputs.existing != 'true'
@@ -93,11 +94,15 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           mkdir -p "$RUNNER_TEMP/android-assets"
           tools="$ANDROID_HOME/build-tools/35.0.0"
-          "$tools/zipalign" -P 16 -f 4 apps/android/app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/android-aligned.apk"
-          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
-            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
-            --out "$RUNNER_TEMP/android-assets/alreadyon-android.apk" "$RUNNER_TEMP/android-aligned.apk"
-          "$tools/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/android-assets/alreadyon-android.apk"
+          for variant in app tv; do
+            asset="alreadyon-android.apk"
+            if [ "$variant" = tv ]; then asset="alreadyon-tv.apk"; fi
+            "$tools/zipalign" -P 16 -f 4 "apps/android/$variant/build/outputs/apk/release/$variant-release-unsigned.apk" "$RUNNER_TEMP/android-aligned.apk"
+            "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+              --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+              --out "$RUNNER_TEMP/android-assets/$asset" "$RUNNER_TEMP/android-aligned.apk"
+            "$tools/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/android-assets/$asset"
+          done
       - name: Publish verified APK and provenance as a prerelease
         if: steps.version.outputs.existing != 'true'
         env:
