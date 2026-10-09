@@ -21,3 +21,5 @@ Inspect Compose configuration, then start the existing service. Verify image dig
 For development builds, `make image` builds locally and `make test-container` validates a disposable runtime. Full release checks and maintainer-controlled publication are described in [delivery](../docs/CI_CD.md). Automatic update scripts are optional; review their timing and target before enabling them.
 
 Review [LICENSE](../LICENSE) and third-party codec/dependency obligations before redistributing images.
+
+The Compose example includes HTTP-01 forwarding guidance, configurable GPU group IDs, timezone, media mounts and transcode RAM sizing. Review these example values for your host before use.
