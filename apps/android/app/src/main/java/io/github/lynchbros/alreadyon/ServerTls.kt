@@ -22,7 +22,7 @@ internal fun OkHttpClient.Builder.serverTls(origin: HttpUrl, bypass: Boolean, tr
         val manager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(store) }
         val trust = manager.trustManagers.filterIsInstance<X509TrustManager>().single()
         val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), SecureRandom()) }
-        // The user-confirmed instance trust anchor identifies this LAN server, including its IP.
+        // The accepted instance trust anchor identifies this LAN server, including its IP.
         return sslSocketFactory(context.socketFactory, trust).hostnameVerifier { host, _ -> host == origin.host }
             .followRedirects(false).followSslRedirects(false)
             .addInterceptor { chain ->

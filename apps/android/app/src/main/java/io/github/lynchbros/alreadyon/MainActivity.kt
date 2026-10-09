@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
                             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                         }
                         when {
-                            !state.signedIn -> LoginScreen(state, model)
+                            !state.signedIn -> ServerConnectScreen(state, model, Modifier.weight(1f))
                             state.mustChangePassword -> AccountScreen(state, model, forced = true)
                             state.settings == "account" -> AccountScreen(state, model)
                             state.settings == "profile" -> ProfileSettingsScreen(state, model)
@@ -228,45 +228,6 @@ private fun AccountPasswordField(label: String, value: String, changed: (String)
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth(),
         trailingIcon = { TextButton(onClick = { visible = !visible }) { Text(if (visible) "Hide" else "Show") } })
-}
-
-@Composable
-private fun LoginScreen(state: PhoneState, model: PhoneModel) {
-    var address by rememberSaveable { mutableStateOf(state.origin) }
-    var bypassTls by rememberSaveable(address) { mutableStateOf(state.bypassTls && serverOrigin(address) == state.origin) }
-    var username by remember { mutableStateOf("") }
-    // Password deliberately excludes rememberSaveable and all persistence.
-    var password by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-    val keyboard = LocalSoftwareKeyboardController.current
-    // Request the IME on focus; emulator hardware-keyboard policy is configured separately.
-    val fieldModifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) keyboard?.show() }
-    val eye = remember(showPassword) {
-        val shape = if (showPassword)
-            "M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"
-        else "M2 2l20 20-1.4 1.4-4.1-4.1c-1.4.5-2.9.7-4.5.7-5 0-9.3-3.1-11-7.5 1-2.4 2.7-4.4 4.8-5.7L.6 3.4 2 2zm5.2 6.2A5 5 0 0 0 15.8 17L7.2 8.2zM12 4.5c5 0 9.3 3.1 11 7.5a13.7 13.7 0 0 1-3.4 4.9l-3-3a5 5 0 0 0-6.5-6.5L7.7 5c1.4-.3 2.8-.5 4.3-.5z"
-        ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
-            .addPath(PathParser().parsePathString(shape).toNodes(), fill = SolidColor(Color.Black)).build()
-    }
-    LazyColumn(contentPadding = PaddingValues(top = 40.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Connect to your AlreadyOn server") }
-        if (state.origin.isNotBlank()) item { TextButton(onClick = model::reconnect, enabled = !state.busy) { Text("Reconnect saved session") } }
-        item { OutlinedTextField(address, { address = it }, label = { Text("HTTPS server address") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = fieldModifier) }
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = bypassTls, onCheckedChange = { bypassTls = it })
-                Text("Bypass TLS certificate verification")
-            }
-            if (bypassTls) Text("This server’s identity will not be verified. Use only for a server you trust on a trusted network.", color = MaterialTheme.colorScheme.error)
-        }
-        item { OutlinedTextField(username, { username = it }, label = { Text("Username") }, singleLine = true, modifier = fieldModifier) }
-        item { OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true,
-            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = { IconButton(onClick = { showPassword = !showPassword }) {
-                Icon(eye, contentDescription = if (showPassword) "Hide password" else "Show password")
-            } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = fieldModifier) }
-        item { Button(onClick = { model.login(address, username, password, bypassTls); password = "" }, enabled = !state.busy && username.isNotBlank() && password.isNotEmpty()) { Text("Sign in") } }
-    }
 }
 
 @Composable

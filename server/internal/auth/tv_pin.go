@@ -10,7 +10,7 @@ import (
 var ErrInvalidTVPIN = errors.New("TV PIN must contain 6–12 numeric digits")
 var ErrTVPINTaken = errors.New("That TV PIN is already in use; choose a different PIN")
 
-// TV PINs identify accounts without exposing a list of usernames to discovery.
+// Discovery never advertises usernames or PINs; sign-in requires both.
 // A server-specific Argon2id salt permits a unique indexed lookup with one
 // expensive hash per guess, rather than a fast hash or work proportional to users.
 func tvPINDigest(ctx context.Context, db *sql.DB, pin string) ([]byte, error) {
@@ -62,7 +62,7 @@ func ClearTVPIN(ctx context.Context, db *sql.DB, userID int64) error {
 	return err
 }
 
-func AuthenticateTVPIN(ctx context.Context, db *sql.DB, pin string) (User, bool, error) {
+func AuthenticateTVPIN(ctx context.Context, db *sql.DB, username, pin string) (User, bool, error) {
 	digest, err := tvPINDigest(ctx, db, pin)
 	if errors.Is(err, ErrInvalidTVPIN) {
 		return User{}, false, nil
@@ -71,7 +71,7 @@ func AuthenticateTVPIN(ctx context.Context, db *sql.DB, pin string) (User, bool,
 		return User{}, false, err
 	}
 	var id int64
-	err = db.QueryRowContext(ctx, `SELECT user_id FROM tv_pairing_pins WHERE pin_digest = ?`, digest).Scan(&id)
+	err = db.QueryRowContext(ctx, `SELECT p.user_id FROM tv_pairing_pins p JOIN users u ON u.id = p.user_id WHERE p.pin_digest = ? AND u.username = ?`, digest, strings.TrimSpace(username)).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, false, nil
 	}

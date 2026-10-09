@@ -1,5 +1,6 @@
 package io.github.lynchbros.alreadyon
 
+import android.os.SystemClock
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -53,20 +54,34 @@ class TvNavigationTest {
             override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
             override fun onUnregistrationFailed(info: NsdServiceInfo, code: Int) = Unit
         }
+        val manual = InstrumentationRegistry.getArguments().getString("entryMode") == "manual"
+        val startedAt = SystemClock.elapsedRealtime()
         try {
-            nsd.registerService(NsdServiceInfo().apply {
+            if (!manual) nsd.registerService(NsdServiceInfo().apply {
                 serviceName = "AlreadyOn TV fixture"; serviceType = "_alreadyon._tcp."
                 setPort(bridge.localPort)
             }, NsdManager.PROTOCOL_DNS_SD, listener)
-            assertTrue("Fixture discovery registration", registered.await(10, TimeUnit.SECONDS))
+            if (!manual) assertTrue("Fixture discovery registration", registered.await(10, TimeUnit.SECONDS))
             fun exists(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
             fun click(text: String) {
                 compose.waitUntil(60000) { exists(text) }
-                compose.onAllNodesWithText(text).onFirst().performClick()
+                compose.onAllNodesWithText(text).onFirst().performScrollTo().performClick()
             }
-            compose.waitUntil(60000) { compose.onAllNodes(hasText("AlreadyOn TV fixture ·", substring = true)).fetchSemanticsNodes().isNotEmpty() }
-            compose.onAllNodes(hasText("AlreadyOn TV fixture ·", substring = true)).onFirst().performClick()
-            click("Confirm Server")
+            if (manual) {
+                assertFalse("No manual address before search timeout", exists("HTTPS server address"))
+                compose.waitUntil(40000) { exists("HTTPS server address") }
+                assertTrue("Search lasts 30 seconds", SystemClock.elapsedRealtime() - startedAt >= 28500)
+                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).performTextInput("https://127.0.0.1:${bridge.localPort}")
+                device.pressBack() // Dismiss the TV keyboard.
+                click("Check Server")
+            } else {
+                compose.waitUntil(60000) { compose.onAllNodes(hasText("AlreadyOn TV fixture ·", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+                compose.onAllNodes(hasText("AlreadyOn TV fixture ·", substring = true)).onFirst().performClick()
+            }
+            compose.waitUntil(60000) { exists("Username") }
+            assertFalse("Server fingerprint confirmation is skipped", exists("Confirm Server"))
+            compose.onNode(hasSetTextAction() and hasText("Username")).performTextInput("tv-fixture")
+            device.pressBack() // Dismiss the keyboard before using the PIN keypad.
             // Synthetic account PIN set by the isolated test fixture, never a live account.
             "123456".forEach { click(it.toString()) }
             click("Connect")

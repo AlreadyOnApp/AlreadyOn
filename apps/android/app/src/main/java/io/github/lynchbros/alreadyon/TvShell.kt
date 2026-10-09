@@ -79,7 +79,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             when {
-                !state.signedIn -> TvConnectScreen(state, model, Modifier.weight(1f))
+                !state.signedIn -> ServerConnectScreen(state, model, Modifier.weight(1f))
                 state.mustChangePassword -> AccountScreen(state, model, forced = true)
                 state.settings == "account" -> AccountScreen(state, model)
                 state.settings == "profile" -> ProfileSettingsScreen(state, model)

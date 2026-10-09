@@ -211,8 +211,8 @@ paths:
       operationId: getTVTrust
       tags: [auth]
       security: []
-      summary: Read the public certificate trust anchor for explicit local TV confirmation
-      description: Requires HTTPS and a direct LAN peer. Compare the SHA-256 fingerprint with Admin Settings before sending a PIN; discovery is not proof of identity.
+      summary: Read the public certificate trust anchor for local native sign-in
+      description: Requires HTTPS and a direct LAN peer. Native apps accept the instance trust anchor automatically on first connection, then validate HTTPS against it before sending username and PIN. The fingerprint remains available for optional out-of-band verification.
       responses:
         '200':
           description: Public PEM certificate and fingerprint, never private keys
@@ -232,7 +232,7 @@ paths:
       operationId: loginTV
       tags: [auth]
       security: []
-      summary: Sign in to the account identified by a unique TV PIN on the LAN
+      summary: Sign in with username and account TV PIN on the LAN
       description: Requires HTTPS and a direct LAN peer. Subject to per-peer and aggregate failed-attempt limits and bounded credential concurrency. Disabled accounts or accounts requiring password changes cannot pair.
       requestBody:
         required: true
@@ -240,9 +240,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [pin]
+              required: [username, pin]
               additionalProperties: false
               properties:
+                username: {type: string}
                 pin: {type: string, pattern: '^[0-9]{6,12}$'}
       responses:
         '200':
@@ -252,7 +253,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthStatus'
         '401':
-          description: PIN not accepted
+          description: Username or PIN not accepted
         '403':
           description: Not a local HTTPS request
         '429':

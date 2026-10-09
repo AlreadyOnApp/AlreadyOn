@@ -2,7 +2,7 @@
 
 [![AlreadyOn](../../web/public/branding/header-doc.svg)](../../README.md)
 
-A Kotlin/Compose client with Media3 playback for an AlreadyOn installation. Enter your own HTTPS server address; no public demo server or shared credentials are supplied.
+A Kotlin/Compose client with Media3 playback for an AlreadyOn installation. Both mobile and TV search for local servers for 30 seconds, then offer manual HTTPS address entry. The server certificate is accepted automatically; sign in with username and the TV PIN set for your account in WebUI Admin Settings.
 
 ## Build
 
@@ -18,4 +18,4 @@ In fullscreen portrait or landscape, swipe up to the next higher available chann
 
 Use an isolated server and check login/logout, profile permissions, guide navigation, tuning, program boundaries, track selection, rotation and background recovery. Verify physical-device playback independently of emulator behavior.
 
-TLS verification is enabled by default. The optional per-server bypass is under security review; prefer a trusted certificate. See [Android architecture](../../docs/ANDROID.md), [emulator setup](../../docs/ANDROID_EMULATOR.md) and [OpenAPI](../../api/openapi.yaml).
+No fingerprint confirmation is requested. Subsequent connections validate the accepted instance trust anchor. See [Android architecture](../../docs/ANDROID.md), [emulator setup](../../docs/ANDROID_EMULATOR.md) and [OpenAPI](../../api/openapi.yaml).
