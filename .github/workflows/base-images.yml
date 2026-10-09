@@ -1,8 +1,7 @@
-# Scheduled refreshes capture Ubuntu, codec and browser security updates even
-# when the repository's base-image recipe has not changed.
-name: Weekly Build Base Images
+# Explicit refresh builds both shared bases with current upstream packages.
+name: Refresh Base Images
 on:
-  # Local builds refresh expired bases on demand while Actions credits are exhausted.
+  # Maintainers explicitly approve registry refreshes.
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,10 +14,10 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 90
     steps:
-      # Scheduled workflows are defined by main but build the active dev recipe.
+      # Build the explicitly selected workflow branch and its current recipe.
       - uses: actions/checkout@v7
         with:
-          ref: dev
+          ref: ${{ github.ref }}
           persist-credentials: false
       - name: Make room for the two base images
         run: |
