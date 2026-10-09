@@ -1,0 +1,37 @@
+name: Publish documentation site
+on:
+  push:
+    branches: [main]
+    paths: [README.md, 'web/public/branding/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Prepare project landing page
+        run: |
+          mkdir -p _site
+          cp web/public/branding/banner.svg _site/banner.svg
+          cat > _site/index.html <<'HTML'
+          <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AlreadyOn</title><style>body{background:#12141a;color:#dfe3ea;font:18px system-ui;max-width:800px;margin:3rem auto;padding:1rem}img{width:100%}a{color:#77a7ff}</style><img src="banner.svg" alt="AlreadyOn — Your library, tuned to you"><h1>AlreadyOn</h1><p>Scheduled television-style playback from your own media library.</p><a href="https://github.com/AlreadyOnApp/AlreadyOn#readme">Documentation and source</a></html>
+          HTML
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-26.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

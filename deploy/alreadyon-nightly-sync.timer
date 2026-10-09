@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily 08:00 New York AlreadyOn nightly sync
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 America/New_York
+# Run a missed sync at boot when the deployment host was off at 08:00.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

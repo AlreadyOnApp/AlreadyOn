@@ -1,0 +1,141 @@
+# Dev merges and the 06:00 New York schedule build fresh, independently validated releases.
+name: OnDemand Build Release Image
+on:
+  # Publication is manual after deployment validation; no push/scheduled release.
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Optional dev merge commit; empty selects the current dev head
+        type: string
+        default: ''
+permissions:
+  contents: read
+env:
+  TZ: America/New_York
+concurrency:
+  group: dev-release-build
+  cancel-in-progress: false
+jobs:
+  select:
+    if: ${{ github.event_name == 'schedule' || github.ref_name == 'dev' }}
+    runs-on: ubuntu-26.04
+    outputs:
+      revision: ${{ steps.source.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || (github.event_name == 'push' && github.sha) || 'dev' }}
+          persist-credentials: false
+      - name: Select the exact dev commit for every validation job
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          revision=$(git rev-parse HEAD)
+          current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/dev" --jq .object.sha)
+          test "$revision" = "$current"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+  quality:
+    needs: select
+    uses: ./.github/workflows/quality.yml
+    with:
+      revision: ${{ needs.select.outputs.revision }}
+  bases:
+    needs: select
+    runs-on: ubuntu-26.04
+    timeout-minutes: 90
+    concurrency:
+      group: base-images
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      ci: ${{ steps.resolve.outputs.ci }}
+      runtime: ${{ steps.resolve.outputs.runtime }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.select.outputs.revision }}
+          persist-credentials: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/build-bases
+        id: resolve
+        with:
+          image: ghcr.io/${{ github.repository }}-base
+          revision: ${{ needs.select.outputs.revision }}
+  tests:
+    name: Go and full browser e2e tests
+    needs: [select, bases]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.select.outputs.revision }}
+          persist-credentials: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/test-source
+        with:
+          ci-base: ${{ needs.bases.outputs.ci }}
+  publish:
+    name: Build, validate and publish fresh dev release
+    needs: [select, bases, quality, tests]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    concurrency:
+      group: application-images
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+      statuses: write
+      pull-requests: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.select.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/build-candidate
+        with:
+          revision: ${{ needs.select.outputs.revision }}
+          ci-base: ${{ needs.bases.outputs.ci }}
+          runtime-base: ${{ needs.bases.outputs.runtime }}
+      - name: Refuse publication from an outdated dev tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_REVISION: ${{ needs.select.outputs.revision }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/dev" --jq .object.sha)
+          test "$current" = "$CI_REVISION"
+      - name: Publish nightly and overwrite today's date tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_REVISION: ${{ needs.select.outputs.revision }}
+          SOURCE_IMAGE: alreadyon-ci:candidate
+        run: |
+          IMAGE_TAGS=$(CI_SOURCE_BRANCH=dev python3 scripts/ci/image-tags.py | sed -n 's/^tags=//p')
+          export IMAGE_TAGS
+          python3 scripts/ci/publish-image.py --local
+      - name: Remove overwritten untagged versions, not closed PR tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/clean-images.py --apply --only-untagged

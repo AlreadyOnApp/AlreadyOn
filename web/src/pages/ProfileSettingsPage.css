@@ -1,0 +1,87 @@
+.profile-icon-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* Each section shares one label track without widening unrelated settings forms. */
+.profile-settings-page .admin-card {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+.profile-settings-page .admin-card > :not(.admin-field-row) {
+  grid-column: 1 / -1;
+}
+
+.profile-settings-page .admin-field-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+}
+
+.profile-settings-page .admin-field-row > label {
+  min-width: 0;
+}
+
+.profile-settings-page .admin-field-row > :not(label) {
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .profile-settings-page .admin-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profile-settings-page .admin-field-row {
+    row-gap: 6px;
+  }
+}
+
+.profile-icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.profile-icon-option {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.profile-icon-option-active {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--accent);
+}
+
+.profile-field-error {
+  color: var(--now-highlight-text);
+  background: var(--now-highlight);
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font-size: calc(13px * var(--font-scale));
+  margin-bottom: 10px;
+}
+
+.profile-pin-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.profile-pin-status {
+  flex-wrap: wrap;
+}

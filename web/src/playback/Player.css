@@ -1,0 +1,119 @@
+.playback-player { container-type: size; position: relative; width: 100%; height: 100%; min-height: 140px; background: #000; }
+.playback-player video { width: 100%; height: 100%; object-fit: contain; }
+.playback-message { position: absolute; inset: 12px 12px auto; color: #fff; background: #151515e8; padding: 10px; font-size: 14px; }
+.playback-message button { display: block; margin-top: 8px; }
+/* Errors stay above the controls; native modal stays readable in every player size. */
+.playback-message { z-index: 5; max-height: calc(100% - 24px); overflow: auto; border-radius: 6px; line-height: 1.45; }
+.codec-help { position: fixed; inset: 0; margin: auto; box-sizing: border-box; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid #626875; border-radius: 12px; background: #202329; color: #f4f5f7; font-size: 15px; line-height: 1.55; cursor: auto; }
+.codec-help::backdrop { background: #000a; }
+.codec-help-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.codec-help h2 { margin: 0; font-size: 20px; }
+.codec-help button { padding: 6px 12px; background: #353b46; color: #fff; border: 1px solid #697180; border-radius: 5px; cursor: pointer; }
+.codec-help ol { padding-left: 22px; }
+.codec-help li { margin: 8px 0; }
+.codec-help section { border-top: 1px solid #454c58; margin-top: 20px; padding-top: 16px; }
+.codec-help h3 { margin: 0; font-size: 17px; }
+.codec-help code { overflow-wrap: anywhere; }
+.codec-help a { color: #a9d5ff; text-decoration: underline; }
+.codec-help :focus-visible { outline: 2px solid #a9d5ff; outline-offset: 4px; }
+.codec-help-note { font-size: 13px; color: #c8cdd5; }
+
+.playback-freeze { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; background: #000; }
+.playback-freeze[hidden] { display: none; }
+.playback-notice { position: absolute; top: 8px; right: 8px; max-width: 80%; padding: 6px 10px; color: #fff; font-size: 13px; background: #151515e8; border-radius: 4px; pointer-events: none; }
+.playback-subtitles { position: absolute; left: 6%; right: 6%; bottom: 14%; text-align: center; color: #fff; font-size: clamp(11px, 2.4vw, 22px); line-height: 1.25; white-space: pre-line; pointer-events: none; text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000; }
+
+.playback-controls { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 6px; padding: 18px 8px 6px; color: #fff; background: linear-gradient(transparent, #000c); opacity: 0; transition: opacity 0.15s; }
+.playback-player:not(.is-idle):hover .playback-controls, .playback-player.is-paused .playback-controls, .playback-controls.is-open { opacity: 1; }
+.playback-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; color: inherit; background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.playback-btn:hover, .playback-btn.is-on { background: #ffffff33; }
+.playback-time { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.playback-progress { flex: 1; min-width: 20px; height: 4px; background: #ffffff40; border-radius: 2px; overflow: hidden; }
+.playback-progress > div { height: 100%; background: #fff; }
+.playback-volume { width: 64px; accent-color: #fff; }
+.playback-menu { position: absolute; right: 8px; bottom: 42px; display: flex; flex-direction: column; min-width: 150px; padding: 4px; background: #151515f2; border: 1px solid #444; border-radius: 6px; }
+.playback-menu button { line-height: 17px; display: flex; justify-content: space-between; gap: 16px; padding: 6px 10px; color: #fff; font-size: 13px; text-align: left; background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.playback-menu-list { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; max-height: min(145px, calc(100cqh - 100px)); }
+.playback-menu button:hover { background: #ffffff26; }
+.playback-menu button[aria-checked='true']::before { content: '✓'; margin-right: -8px; }
+.playback-details { position: absolute; top: 8px; left: 8px; max-width: min(620px, calc(100% - 16px)); max-height: calc(100% - 64px); overflow: auto; padding: 8px 10px; color: #fff; font-size: 11px; line-height: 1.35; background: #000000c0; border-radius: 4px; pointer-events: auto; scrollbar-width: thin; }
+.playback-details dl { margin: 0; }
+.playback-details dl > div { display: grid; grid-template-columns: 9.5em 1fr; gap: 8px; }
+.playback-details dt { color: #9ec5ff; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.playback-details dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+@container (max-width: 560px) { .playback-details { font-size: 9px; padding: 4px 6px; } .playback-details dl > div { grid-template-columns: 8em 1fr; gap: 4px; } }
+.playback-player.is-idle:not(.is-paused) { cursor: none; }
+
+/* Temporary commercial cleanup stays reachable in normal and fullscreen playback. */
+.playback-delete-commercial {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 15;
+  padding: 8px 12px;
+  border: 1px solid #fff;
+  border-radius: 5px;
+  background: #8c2020;
+  color: #fff;
+  cursor: pointer;
+}
+.playback-delete-commercial:disabled { opacity: .6; cursor: wait; }
+
+.playback-control-bar { display: flex; align-items: center; gap: 6px; width: 100%; }
+.playback-program { display: none; width: 100%; align-items: stretch; gap: 14px; text-shadow: 0 1px 3px #000; }
+.playback-player.is-large .playback-program, .playback-player:fullscreen .playback-program { display: flex; }
+.playback-program-station { display: flex; flex-direction: column; justify-content: center; flex: 0 1 auto; max-width: 30%; padding-right: 14px; border-right: 1px solid #ffffff70; }
+.playback-program-number { font-size: clamp(26px, 3cqw, 40px); font-weight: 700; line-height: 1; }
+.playback-program-channel { font-size: clamp(10px, 1.2cqw, 14px); font-weight: 500; margin-top: 3px; }
+.playback-program-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; gap: 2px; }
+.playback-program-series, .playback-program-title { font-size: clamp(18px, 2cqw, 26px); line-height: 1.2; font-weight: 600; }
+.playback-program-info.is-episode .playback-program-title { font-size: clamp(13px, 1.5cqw, 18px); font-weight: 400; color: #d0d0d0; }
+.playback-program span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Expanded controls follow the mockup: progress above the transport row and a
+   shared inset for the station/program label, progress and play button. */
+.playback-player:is(.is-large, :fullscreen) .playback-controls { padding: 24px clamp(16px, 6cqw, 80px) 10px; gap: 10px; background: linear-gradient(transparent, #000b 30%, #000d); }
+.playback-player:is(.is-large, :fullscreen) .playback-control-bar { flex-wrap: wrap; }
+.playback-player:is(.is-large, :fullscreen) .playback-progress { order: -1; flex: 0 0 100%; overflow: visible; background: #ffffff50; }
+.playback-player:is(.is-large, :fullscreen) .playback-progress > div { position: relative; background: #389bea; border-radius: 2px; }
+.playback-player:is(.is-large, :fullscreen) .playback-progress > div::after { content: ''; position: absolute; right: -5px; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 2px #0008; }
+.playback-player:is(.is-large, :fullscreen) .playback-time { margin-right: auto; }
+
+.playback-player:is(.is-large, :fullscreen).show-channel-overlay .playback-controls { opacity: 1; }
+
+@media (pointer: coarse) {
+  /* Touch has no reliable hover: visibility follows the same idle state in
+     portrait and landscape, including paused playback and open menus. */
+  .playback-player:not(.is-idle) .playback-controls { opacity: 1; }
+  .playback-player.is-idle .playback-controls {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .playback-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .playback-control-bar {
+    gap: 4px;
+  }
+
+  .playback-volume {
+    display: none;
+  }
+
+  .playback-menu button {
+    min-height: 44px;
+  }
+}
+
+/* Touch landscape fills the viewport even when native fullscreen is denied.
+   Keep the existing player mounted so rotation never retunes or pauses video. */
+.playback-player.is-landscape-player {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 0;
+}

@@ -1,0 +1,158 @@
+.log-viewer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.log-viewer-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.log-level-chip {
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: var(--admin-body-size);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.log-level-chip-active {
+  opacity: 1;
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.log-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-viewer-actions select {
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--admin-body-size);
+}
+
+.log-viewer {
+  --log-row-height: calc(var(--admin-body-size) * 1.4 + 4px);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Takes the rest of the card and scrolls inside it. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: var(--admin-body-size);
+}
+
+.log-line {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-line.log-level-error,
+.log-line.log-level-critical {
+  border-left: 3px solid var(--now-highlight);
+  padding-left: 6px;
+  margin-left: -9px;
+}
+
+.log-line-time {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.log-line-level-badge {
+  flex-shrink: 0;
+  text-transform: uppercase;
+  font-weight: bold;
+  width: 4.5em;
+}
+
+.log-level-badge-debug {
+  color: var(--text-muted);
+}
+
+.log-level-badge-info {
+  color: var(--text);
+}
+
+.log-level-badge-warn {
+  color: var(--accent);
+}
+
+.log-level-badge-error {
+  color: var(--now-highlight);
+}
+
+.log-level-badge-critical {
+  background: var(--now-highlight);
+  color: var(--now-highlight-text);
+  border-radius: var(--radius);
+  padding: 0 4px;
+  width: fit-content;
+}
+
+.log-line-message {
+  color: var(--text);
+  flex: 1;
+}
+
+.log-viewer-empty {
+  color: var(--text-muted);
+  font-family: inherit;
+}
+
+.log-viewer-paused-hint {
+  color: var(--text-muted);
+  font-size: var(--admin-body-size);
+  margin-top: 6px;
+}
+
+.log-viewer-busy-hint {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: var(--admin-body-size);
+  margin-bottom: 12px;
+  padding: 8px 12px;
+}
+
+.log-viewer-controls .admin-btn[aria-pressed='true'] {
+  border-color: var(--accent);
+}
+
+.log-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}

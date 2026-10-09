@@ -1,0 +1,400 @@
+package io.github.lynchbros.alreadyon
+
+import android.app.Application
+import android.media.MediaCodecInfo
+import android.media.MediaCodecList
+import android.media.MediaFormat
+import android.os.SystemClock
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.IOException
+import java.time.Instant
+
+/** Authorized media metadata is ephemeral and never saved in Android instance state. */
+internal data class PhonePlayback(val url: String, val title: String, val startMs: Long, val revision: Long, val hlsTargetMs: Long? = null, val capturedAt: Long = SystemClock.elapsedRealtime(),
+    val seriesTitle: String = "", val episodeLabel: String = "", val mediaFileId: Long = -1, val sourceHeight: Int = 720,
+    val audioTracks: List<PhoneTrack> = emptyList(), val subtitleTracks: List<PhoneTrack> = emptyList(),
+    val streamOffsetSeconds: Double = 0.0, val hlsOriginMs: Long? = null, val bypassTls: Boolean = false)
+internal data class PhoneState(
+    val username: String = "", val role: String = "viewer", val mustChangePassword: Boolean = false,
+    val passwordLocked: Boolean = true, val settings: String? = null, val notice: String? = null,
+    val origin: String = "", val bypassTls: Boolean = false, val signedIn: Boolean = false, val busy: Boolean = false,
+    val error: String? = null, val profiles: List<ViewerProfile> = emptyList(),
+    val profile: ViewerProfile? = null, val channels: List<GuideChannel> = emptyList(),
+    val channel: GuideChannel? = null, val playback: PhonePlayback? = null,
+    val quality: Int = 0, val subtitleIndex: Int? = null, val subtitleFileId: Long? = null, val audioIndex: Int? = null, val audioFileId: Long? = null,
+    val paused: Boolean = false, val muted: Boolean = false,
+)
+
+/** Owns the phone session and single playback lease independently of Activity rotations. */
+internal class PhoneModel(application: Application) : AndroidViewModel(application) {
+    private val sessionStore = SessionStore(application)
+    private val preferences = application.getSharedPreferences("connection", Application.MODE_PRIVATE)
+    private val mutable = MutableStateFlow(PhoneState(origin = preferences.getString("server_origin", "").orEmpty(), bypassTls = preferences.getBoolean("bypass_tls", false)))
+    val state = mutable.asStateFlow()
+    private var client: ServerClient? = null
+    private var action: Job? = null
+    private var viewing: Job? = null
+    private var guideEntry: Job? = null
+    private var serial = 0L
+    private var capabilities: JSONObject? = null
+    private var capabilityTime = 0L
+
+    private fun update(block: (PhoneState) -> PhoneState) { mutable.value = block(mutable.value) }
+    suspend fun profileIcon(path: String) = client?.profileIcon(path)
+
+    fun dismissError() = update { it.copy(error = null) }
+
+    private fun perform(block: suspend () -> Unit) {
+        if (action?.isActive == true) return
+        action = viewModelScope.launch {
+            update { it.copy(busy = true, error = null) }
+            try { block() } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                handleFailure(e)
+                update { it.copy(error = safeError(e)) }
+            }
+            finally { update { it.copy(busy = false) } }
+        }
+    }
+
+    init { reconnect() }
+
+    /** Revalidate saved credentials with the server; protected profiles still require their PIN. */
+    fun reconnect() = perform {
+        val origin = serverOrigin(state.value.origin) ?: return@perform
+        val api = client ?: ServerClient(origin, sessionStore, state.value.bypassTls).also { client = it }
+        if (!api.hasSession()) return@perform
+        val status = JSONObject(api.request("/api/auth/status"))
+        if (!status.optBoolean("authenticated")) { expireSession(); return@perform }
+        readAccount(status)
+        if (state.value.mustChangePassword) return@perform
+        val profiles = api.profiles()
+        update { it.copy(profiles = profiles) }
+        val saved = profiles.find { it.id == preferences.getLong("profile_id", -1) && !it.hasPin }
+        if (saved != null) {
+            val channels = api.guide(saved)
+            update { it.copy(profile = saved, channels = channels) }
+            restoreChannel(saved, channels)
+        }
+    }
+
+    private fun expireSession() {
+        stopWatching()
+        client?.clearSession(); client = null
+        preferences.edit().remove("profile_id").apply()
+        update { PhoneState(origin = it.origin, bypassTls = it.bypassTls) }
+    }
+
+    fun login(rawOrigin: String, username: String, password: String, bypassTls: Boolean = false) = perform {
+        val origin = serverOrigin(rawOrigin) ?: throw IOException("Enter a valid HTTPS server address.")
+        if (isLoopback(java.net.URI(origin).host)) throw IOException("Localhost points to this phone. Use the server hostname.")
+        client?.clearSession()
+        val api = ServerClient(origin, sessionStore, bypassTls)
+        val status = JSONObject(api.request("/api/auth/login", "POST",
+            JSONObject().put("username", username).put("password", password)))
+        if (!status.optBoolean("authenticated")) throw IOException("Sign-in was not accepted.")
+        client = api
+        preferences.edit().putString("server_origin", origin).putBoolean("bypass_tls", bypassTls).commit()
+        update { it.copy(origin = origin, bypassTls = bypassTls) }
+        readAccount(JSONObject(api.request("/api/auth/status")))
+        if (state.value.mustChangePassword) return@perform
+        val profiles = api.profiles()
+        update { it.copy(profiles = profiles) }
+    }
+
+    /** Account restrictions take precedence over profile and playback navigation. */
+    private fun readAccount(status: JSONObject) = update { it.copy(
+        signedIn = status.optBoolean("authenticated"), username = status.optString("username"),
+        role = status.optString("role", "viewer"), mustChangePassword = status.optBoolean("mustChangePassword"),
+        passwordLocked = status.optBoolean("passwordLocked", true)) }
+
+    private fun handleFailure(error: Exception) {
+        if (error is ServerFailure && error.sessionExpired) expireSession()
+        if (error is ServerFailure && error.code == "password_change_required") {
+            stopWatching()
+            update { it.copy(mustChangePassword = true, settings = null, profile = null, profiles = emptyList(), channels = emptyList()) }
+        }
+    }
+
+    fun openSettings(screen: String) {
+        if (screen == "account" && state.value.profile?.role != "admin") return
+        stopWatching()
+        update { it.copy(settings = screen, error = null, notice = null) }
+    }
+    fun closeSettings() {
+        update { it.copy(settings = null, error = null, notice = null) }
+        enterGuide()
+    }
+
+    /** Every guide entry re-reads server state so another device’s successful tune wins. */
+    fun enterGuide() {
+        guideEntry?.cancel()
+        guideEntry = viewModelScope.launch {
+            // Do not lose navigation restoration when a periodic guide request is already running.
+            action?.join()
+            perform {
+                val current = state.value.profile ?: return@perform
+                if (state.value.settings != null) return@perform
+                val api = requireNotNull(client)
+                val profile = api.profiles().find { it.id == current.id } ?: return@perform
+                val channels = api.guide(profile)
+                update { it.copy(profile = profile, channels = channels, muted = true, paused = false) }
+                restoreChannel(profile, channels)
+            }
+        }
+    }
+
+    /** Rename first; retain the successful name if a subsequent password update fails. */
+    fun saveAccount(current: String, username: String, password: String, confirmation: String) = perform {
+        val api = requireNotNull(client)
+        if (state.value.passwordLocked) throw ServerFailure(403, "This account is locked.")
+        if (password != confirmation || (password.isNotEmpty() && password.length < 4))
+            throw ServerFailure(400, "New passwords must match and contain at least four characters.")
+        if (state.value.mustChangePassword && password.isEmpty()) throw ServerFailure(400, "Enter a new password.")
+        if (!state.value.mustChangePassword && username.trim() != state.value.username) {
+            val result = JSONObject(api.request("/api/auth/username", "POST", JSONObject().put("currentPassword", current).put("newUsername", username.trim())))
+            update { it.copy(username = result.getString("username")) }
+        }
+        if (password.isNotEmpty()) api.request("/api/auth/password", "POST", JSONObject().put("currentPassword", current).put("newPassword", password))
+        val forced = state.value.mustChangePassword
+        readAccount(JSONObject(api.request("/api/auth/status")))
+        if (forced) {
+            val profiles = api.profiles()
+            update { it.copy(profiles = profiles) }
+        }
+        update { it.copy(notice = "Changes saved.") }
+    }
+
+    /** Save only changed fields; unrelated edits from other clients remain intact. */
+    fun saveProfile(patch: JSONObject, upload: ByteArray? = null) = perform {
+        val api = requireNotNull(client)
+        val profile = state.value.profile ?: return@perform
+        if (patch.length() > 0) api.request("/api/profiles/${profile.id}", "PATCH", patch)
+        if (upload != null) api.request("/api/profiles/${profile.id}/icon", "POST", upload = upload)
+        val profiles = api.profiles()
+        update { it.copy(profiles = profiles, profile = profiles.find { p -> p.id == profile.id }, settings = null) }
+        val updated = state.value.profile ?: return@perform
+        val channels = api.guide(updated)
+        update { it.copy(channels = channels) }
+        restoreChannel(updated, channels)
+    }
+
+    /** PIN actions apply immediately, independently of the settings draft, like the WebUI. */
+    fun savePin(pin: String?) = perform {
+        val profile = state.value.profile ?: return@perform
+        requireNotNull(client).request("/api/profiles/${profile.id}/pin", if (pin == null) "DELETE" else "PUT",
+            pin?.let { JSONObject().put("pin", it) })
+        val profiles = requireNotNull(client).profiles()
+        update { it.copy(profiles = profiles, profile = profiles.find { p -> p.id == profile.id }, notice = "PIN updated.") }
+    }
+
+    fun refreshProfiles() = perform {
+        val profiles = requireNotNull(client).profiles()
+        update { it.copy(profiles = profiles) }
+    }
+
+    fun selectProfile(profile: ViewerProfile, pin: String) = perform {
+        val api = requireNotNull(client)
+        if (profile.hasPin) {
+            val result = JSONObject(api.request("/api/profiles/${profile.id}/verify-pin", "POST", JSONObject().put("pin", pin)))
+            if (!result.optBoolean("valid")) throw IOException("Profile PIN was not accepted.")
+        }
+        // The chooser can outlive a tune on another device; refresh history at selection time.
+        val profiles = api.profiles()
+        val current = profiles.find { it.id == profile.id } ?: throw IOException("Profile is no longer available.")
+        val channels = api.guide(current)
+        preferences.edit().putLong("profile_id", current.id).apply()
+        update { it.copy(profile = current, profiles = profiles, channels = channels) }
+        restoreChannel(current, channels)
+    }
+
+    private fun restoreChannel(profile: ViewerProfile, channels: List<GuideChannel>) {
+        update { it.copy(muted = true, paused = false, audioIndex = null, audioFileId = null, subtitleIndex = null, subtitleFileId = null) }
+        (channels.find { it.id == profile.lastChannel && it.programs.isNotEmpty() }
+            ?: channels.firstOrNull { it.programs.isNotEmpty() })?.let(::watch)
+    }
+    fun setQuality(height: Int) {
+        update { it.copy(quality = height) }
+        state.value.channel?.let(::watch)
+    }
+    fun setAudio(track: PhoneTrack) {
+        update { it.copy(audioIndex = track.index, audioFileId = it.playback?.mediaFileId) }
+        state.value.channel?.let(::watch)
+    }
+    fun setSubtitle(index: Int?) = update { it.copy(subtitleIndex = index, subtitleFileId = it.playback?.mediaFileId) }
+
+    fun refreshGuide() = perform {
+        val profile = state.value.profile ?: return@perform
+        val channels = requireNotNull(client).guide(profile)
+        update { it.copy(channels = channels) }
+    }
+
+    fun changeProfile() {
+        stopWatching()
+        preferences.edit().remove("profile_id").apply()
+        update { it.copy(profile = null, channels = emptyList(), settings = null, error = null) }
+    }
+
+    fun logout() = perform {
+        stopWatching()
+        viewing?.join()
+        val api = client
+        try { api?.request("/api/auth/logout", "POST") }
+        finally {
+            expireSession()
+        }
+    }
+
+    fun watch(channel: GuideChannel) {
+        val api = client ?: return
+        val profile = state.value.profile ?: return
+        if (state.value.mustChangePassword || state.value.settings != null) return
+        val previous = viewing
+        previous?.cancel()
+        update { it.copy(channel = channel, playback = null, error = null) }
+        viewing = viewModelScope.launch {
+            previous?.join()
+            try {
+                while (true) {
+                    var token: String? = null
+                    try {
+                        // Finish issuance before cancellation so every issued token is known and revocable.
+                        token = withContext(NonCancellable) {
+                            JSONObject(api.request("/api/playback/sessions", "POST", JSONObject().put("channelId", channel.id))).getString("token")
+                        }
+                        val body = JSONObject().put("token", token).put("profileId", profile.id)
+                            .put("audioLanguage", profile.language)
+                            // Auto stays within this client's tested 720p ceiling, including remembered-channel starts.
+                            .put("maxHeight", state.value.quality.takeIf { it > 0 } ?: 720)
+                            .put("capabilities", decoderCapabilities())
+                        if (state.value.audioIndex != null && state.value.audioFileId != null) body
+                            .put("audioTrackIndex", state.value.audioIndex).put("audioMediaFileId", state.value.audioFileId)
+                        var tune = JSONObject(api.request("/api/channels/${channel.id}/tune", "POST", body))
+                        val started = SystemClock.elapsedRealtime()
+                        while (!tune.getBoolean("ready")) {
+                            if (SystemClock.elapsedRealtime() - started > 90_000) throw IOException("Playback did not become ready. Try again.")
+                            delay(1000)
+                            tune = status(api, channel.id, token)
+                        }
+                        val now = Instant.parse(tune.getString("serverTime"))
+                        val end = Instant.parse(tune.getString("entryEndsAt"))
+                        val delaySeconds = tune.optDouble("presentationDelaySeconds", 3.0)
+                        val remainingMs = (end.toEpochMilli() - now.toEpochMilli() + delaySeconds * 1000).toLong()
+                        if (remainingMs <= 0) continue
+                        val direct = tune.getJSONObject("plan").getString("mode") == "direct"
+                        val sourcePosition = (now.toEpochMilli() - Instant.parse(tune.getString("entryStartsAt")).toEpochMilli()) / 1000.0 +
+                            tune.optDouble("sourceOffsetSeconds") - delaySeconds
+                        val offset = if (direct) sourcePosition else sourcePosition - tune.optDouble("streamOffsetSeconds")
+                        val media = PhonePlayback(api.mediaURL(tune.getString("url"), channel.id),
+                            tune.optJSONObject("program")?.optString("title") ?: channel.name,
+                            (offset.coerceAtLeast(0.0) * 1000).toLong(), ++serial,
+                            if (direct || tune.optString("hlsOrigin").isBlank()) null else
+                                Instant.parse(tune.getString("hlsOrigin")).toEpochMilli() + (offset * 1000).toLong(),
+                            seriesTitle = tune.optJSONObject("program")?.takeIf { it.optString("mediaType") == "episode" }?.optString("seriesTitle").orEmpty(),
+                            episodeLabel = tune.optJSONObject("program")?.takeIf { it.optString("mediaType") == "episode" && it.has("episodeNumber") }?.let {
+                                "S${it.optInt("seasonNumber").toString().padStart(2, '0')}E${it.optInt("episodeNumber").toString().padStart(2, '0')} - "
+                            }.orEmpty(),
+                            mediaFileId = tune.optLong("mediaFileId", -1), sourceHeight = tune.optInt("sourceHeight", 720),
+                            audioTracks = phoneTracks(tune.optJSONArray("audioTracks")), subtitleTracks = phoneTracks(tune.optJSONArray("subtitles")),
+                            streamOffsetSeconds = if (direct) 0.0 else tune.optDouble("streamOffsetSeconds"),
+                            bypassTls = state.value.bypassTls, hlsOriginMs = tune.optString("hlsOrigin").takeIf { it.isNotBlank() }?.let { Instant.parse(it).toEpochMilli() })
+                        update { it.copy(playback = media, profile = it.profile?.copy(lastChannel = channel.id),
+                            subtitleIndex = if (it.subtitleFileId == media.mediaFileId) it.subtitleIndex else if (profile.subtitles)
+                                media.subtitleTracks.firstOrNull { t -> t.language == profile.subtitleLanguage || t.language == subtitleISO3(profile.subtitleLanguage) }?.index else null,
+                            subtitleFileId = media.mediaFileId) }
+                        val boundary = SystemClock.elapsedRealtime() + remainingMs
+                        while (SystemClock.elapsedRealtime() < boundary) {
+                            delay(minOf(10_000, (boundary - SystemClock.elapsedRealtime()).coerceAtLeast(1)))
+                            if (SystemClock.elapsedRealtime() < boundary) status(api, channel.id, token)
+                        }
+                        update { it.copy(playback = null) }
+                    } finally {
+                        // Best-effort remote release runs even when channel switching cancels preparation.
+                        if (token != null) withContext(NonCancellable) {
+                            try { withTimeout(5000) { api.request("/api/playback/sessions", "DELETE", JSONObject().put("channelId", channel.id).put("token", token)) } }
+                            catch (_: Exception) { /* Offline servers expire the bounded viewer lease themselves. */ }
+                        }
+                    }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                handleFailure(e)
+                update { it.copy(playback = null, error = safeError(e)) }
+            }
+        }
+    }
+
+    // Backgrounding releases the lease but retains channel choice for a fresh live tune on return.
+    fun suspendWatching() {
+        viewing?.cancel()
+        update { it.copy(playback = null) }
+    }
+    fun resumeWatching() {
+        if (viewing?.isActive != true && state.value.profile != null && state.value.settings == null) enterGuide()
+    }
+
+    fun stopWatching() {
+        viewing?.cancel()
+        update { it.copy(channel = null, playback = null, paused = false) }
+    }
+
+    fun togglePause() {
+        val resume = state.value.paused
+        update { it.copy(paused = !it.paused) }
+        // Resume rejoins the server's current schedule rather than playing behind live time.
+        if (resume) state.value.channel?.let(::watch)
+    }
+    // Physical phone buttons control output volume; the player controls only mute.
+    fun toggleMute() = update { it.copy(muted = !it.muted) }
+
+    fun playerFailed(revision: Long) {
+        if (state.value.playback?.revision != revision) return
+        stopWatching()
+        update { it.copy(error = "The phone could not play this stream. Select the channel to try again.") }
+    }
+
+    private suspend fun status(api: ServerClient, channel: Long, token: String): JSONObject =
+        JSONObject(api.request("/api/playback/status", "POST", JSONObject().put("channelId", channel).put("token", token)))
+
+    /** Query Android decoder support conservatively; do not advertise HDR, HEVC or direct containers yet. */
+    private fun decoderCapabilities(): JSONObject {
+        if (capabilities != null && SystemClock.elapsedRealtime() - capabilityTime < 86_400_000) return capabilities!!
+        val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+        val video = JSONArray()
+        val audio = JSONArray()
+        val format = MediaFormat.createVideoFormat("video/avc", 1280, 720).apply { setInteger(MediaFormat.KEY_FRAME_RATE, 30); setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileConstrainedBaseline); setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31) }
+        if (codecs.findDecoderForFormat(format) != null) video.put(JSONObject().put("codec", "h264")
+            .put("profile", "Constrained Baseline").put("level", 31).put("width", 1280).put("height", 720)
+            .put("fps", 30).put("bitrate", 5_000_000).put("pixelFormat", "yuv420p"))
+        if (codecs.findDecoderForFormat(MediaFormat.createAudioFormat("audio/mp4a-latm", 48000, 2).apply { setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC); setInteger(MediaFormat.KEY_BIT_RATE, 192000) }) != null) {
+            audio.put(JSONObject().put("codec", "aac").put("channels", 2).put("sampleRate", 48000).put("bitrate", 192000).put("profile", "LC").put("hls", true))
+        }
+        // No direct containers forces the existing server HLS compatibility path; mbps=0 uses its 25 Mbps default.
+        capabilities = JSONObject().put("hls", true).put("containers", JSONArray()).put("video", video).put("audio", audio).put("mbps", 0)
+        capabilityTime = SystemClock.elapsedRealtime()
+        return capabilities!!
+    }
+}
+
+/** Avoid reflecting TLS exceptions or request URLs, which can contain scoped media tokens. */
+internal fun safeError(e: Exception): String = when (e) {
+    is ServerFailure -> e.message ?: "The server refused the request."
+    is javax.net.ssl.SSLException -> "TLS verification failed. Check the server hostname and certificate trust."
+    is java.net.UnknownHostException -> "The server hostname could not be found."
+    else -> "Could not connect or read the server response. Check the address and network, then try again."
+}
+
+/** Media track tags may use ISO 639-2 while profile preferences use ISO 639-1. */
+private fun subtitleISO3(code: String) = runCatching { java.util.Locale.forLanguageTag(code).isO3Language }.getOrDefault(code)

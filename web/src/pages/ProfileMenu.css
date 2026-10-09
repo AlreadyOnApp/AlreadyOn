@@ -1,0 +1,146 @@
+.profile-menu {
+  position: relative;
+}
+
+.profile-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 6px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--body-font);
+  font-size: calc(13px * var(--font-scale));
+}
+
+.profile-menu-item:hover {
+  background: var(--surface-alt);
+}
+
+/* The chooser expands independently of the root menu and remains viewport-bound. */
+.profile-menu-expanded {
+  width: min(300px, calc(100vw - 32px));
+  min-width: 0;
+  padding: 8px;
+  gap: 4px;
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
+}
+
+.profile-menu-expanded .profile-menu-item {
+  padding: 10px;
+  font-size: calc(17px * var(--font-scale));
+  overflow-wrap: anywhere;
+}
+
+/* Profile identity stays in one compact left-aligned group. Keeping spare
+   width at the row's end avoids large visual gaps between icon, name and role. */
+.profile-menu-expanded .profile-menu-profile {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.profile-menu-avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.profile-menu-name {
+  min-width: 0;
+}
+
+.profile-menu-profile .profile-menu-role {
+  flex: 0 0 auto;
+}
+
+.profile-menu-expanded .profile-menu-role {
+  font-size: calc(13px * var(--font-scale));
+}
+
+.profile-menu-expanded .profile-menu-pin-prompt {
+  font-size: calc(17px * var(--font-scale));
+}
+
+.profile-menu-item-active {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.profile-menu-back {
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  margin-bottom: 4px;
+  padding-bottom: 10px;
+}
+
+.profile-menu-role {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.profile-menu-item-active .profile-menu-role {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.profile-menu-pin-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px 4px;
+}
+
+.profile-menu-pin-prompt label {
+  font-size: calc(12px * var(--font-scale));
+  color: var(--text-muted);
+}
+
+.profile-menu-pin-prompt input {
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+.profile-menu-pin-error {
+  color: var(--now-highlight-text);
+  background: var(--now-highlight);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-size: calc(12px * var(--font-scale));
+  margin: 0;
+}
+
+.profile-menu-pin-submit {
+  justify-content: center;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: bold;
+}

@@ -1,0 +1,21 @@
+Make -readrate_initial_burst work again (FFmpeg 8.0.x ignores it).
+
+The initial burst is the head start AlreadyOn gives a stream that begins at the
+presented moment (see docs/PLAYBACK.md, Presentation delay). In 8.0.x the first
+packet counts as "lagging" by the burst, which starts the catch-up pacing at the
+normal read rate and cancels the burst. Upstream 8.1 skips pacing while the
+stream is inside the burst; this is that one change. Drop this patch once Ubuntu
+ships a fixed 8.0.x or 8.1 (the build then fails on it, which is the reminder).
+
+--- a/fftools/ffmpeg_demux.c
++++ b/fftools/ffmpeg_demux.c
+@@ -518,6 +518,9 @@ static void readrate_sleep(Demuxer *d)
+         pts = av_rescale(ds->dts, 1000000, AV_TIME_BASE);
+         now = av_gettime_relative();
+         wc_elapsed = now - d->wallclock_start;
++
++        if (pts <= stream_ts_offset + initial_burst) continue;
++
+         max_pts = stream_ts_offset + initial_burst + wc_elapsed * d->readrate;
+         lag = FFMAX(max_pts - pts, 0);
+         if ( (!ds->lag && lag > 0.3 * AV_TIME_BASE) || ( lag > ds->lag + 0.3 * AV_TIME_BASE) ) {

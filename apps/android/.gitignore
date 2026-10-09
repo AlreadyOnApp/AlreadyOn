@@ -1,0 +1,8 @@
+# Android build output and workstation-only SDK/signing configuration.
+.gradle/
+.kotlin/
+**/build/
+local.properties
+signing.properties
+*.jks
+*.keystore

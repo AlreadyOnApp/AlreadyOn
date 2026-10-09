@@ -1,0 +1,15 @@
+/* Branding fits existing header controls without changing their hit targets. */
+.brand-link { display: block; max-width: 100%; flex-shrink: 0; border-radius: 4px; }
+.brand-link-full { width: fit-content; margin: 0 auto 16px; }
+.brand-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.brand-logo { display: block; width: 192px; height: auto; max-width: 100%; flex-shrink: 0; }
+.brand-logo-full { width: 320px; }
+@media (max-width: 640px) {
+  .page-header .brand-logo { width: 150px; }
+  .admin-topbar-inner { gap: 12px; flex-wrap: wrap; }
+  .admin-topbar-inner .brand-logo { width: 150px; }
+}
+/* The narrowest supported phones still keep branding and controls on one row. */
+@media (max-width: 360px) {
+  .page-header .brand-logo { width: 136px; }
+}

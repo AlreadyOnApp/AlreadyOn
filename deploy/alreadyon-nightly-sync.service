@@ -1,0 +1,16 @@
+[Unit]
+Description=Deploy the latest published AlreadyOn nightly image
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/alreadyon-nightly-sync
+User=lynchbros
+Group=lynchbros
+# The docker group is root-equivalent; it is required to replace the container.
+SupplementaryGroups=docker
+TimeoutStartSec=30min
+NoNewPrivileges=true
+PrivateTmp=true

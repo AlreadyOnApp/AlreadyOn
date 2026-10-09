@@ -1,0 +1,616 @@
+.guide-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* Page header --------------------------------------------------------- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.page-header-brand {
+  font-family: var(--heading-font);
+  color: var(--heading-color);
+  /* Brand name is always "AlreadyOn" — never themed to uppercase. */
+  text-transform: none;
+  letter-spacing: var(--letter-spacing);
+  font-size: calc(20px * var(--font-scale));
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The header controls (text size, brightness and profile) share
+   one uniform size/color — deliberately no special accent on any one of
+   them (evaluation feedback: they should look like a matched set). */
+.page-header-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  min-width: 36px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  font-family: var(--body-font);
+  font-size: calc(14px * var(--font-scale));
+  box-shadow: var(--shadow);
+}
+
+/* The profile menu's trigger shows just the user's icon, so it needs
+   tighter padding than the text controls to stay visually circular. */
+.page-header-control-avatar {
+  padding: 0 4px;
+}
+
+/* Native <option> styling is inconsistent across browsers, but this
+   covers Firefox/Chromium (native select controls). */
+.page-header-control option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Text size icon: a big "A" and small "a", like a browser's
+   accessibility text-size picker. Single button, cycles on click.
+   TEMPORARY (evaluation feedback). */
+.icon-aa {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  line-height: 1;
+}
+
+.icon-aa-big {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.icon-aa-small {
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* Instant tooltip: native `title` attributes have a fixed OS/browser
+   hover delay that can't be shortened via CSS, so this replaces it with
+   a plain CSS tooltip that has no transition — it appears the instant
+   :hover matches, not after a delay. */
+.instant-tooltip {
+  position: relative;
+}
+
+.instant-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-size: calc(12px * var(--font-scale));
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: var(--shadow);
+}
+
+.instant-tooltip:hover::after,
+.instant-tooltip:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Preview section ------------------------------------------------------- */
+
+.preview-section {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  padding: 16px 20px;
+  flex-shrink: 0;
+}
+
+.preview-detail {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.preview-detail-main {
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.preview-channel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.preview-channel-badge {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: var(--radius);
+  padding: 2px 10px;
+  font-weight: bold;
+  font-family: var(--heading-font);
+}
+
+.preview-channel-name {
+  color: var(--text-muted);
+  font-size: calc(15px * var(--font-scale));
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--letter-spacing);
+}
+
+.preview-title {
+  font-family: var(--heading-font);
+  color: var(--heading-color);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--letter-spacing);
+  font-size: calc(26px * var(--font-scale));
+  line-height: 1.15;
+}
+
+.preview-episode {
+  font-size: calc(16px * var(--font-scale));
+  color: var(--text);
+  font-weight: var(--body-weight, normal);
+  overflow-wrap: anywhere;
+}
+
+.preview-time,
+.preview-meta {
+  font-size: calc(14px * var(--font-scale));
+  color: var(--text-muted);
+  font-weight: var(--body-weight, normal);
+}
+
+/* Top-left aligned, independent of the centered siblings either side. */
+.preview-description {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--text);
+  font-size: calc(15px * var(--font-scale));
+  font-weight: var(--body-weight, normal);
+  line-height: 1.5;
+  padding: 4px 0 4px 24px;
+  border-left: 1px solid var(--border);
+}
+
+.preview-description .preview-time {
+  margin-top: auto;
+}
+
+.preview-video-wrap {
+  flex-shrink: 0;
+  align-self: flex-start;
+  display: flex;
+  transition: width 0.25s ease;
+}
+
+@media (min-width: 701px) and (max-width: 1100px) {
+  .preview-detail {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .preview-detail-main {
+    width: 100%;
+    max-width: none;
+    flex: 0 0 auto;
+  }
+
+  .preview-description {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding: 12px 0 0;
+  }
+}
+
+/* Large player: the video is as wide as the window allows without being taller
+   than the space under the header (plus a bottom margin like the side margins).
+   The guide fills whatever is left below it; the page only scrolls when that is
+   too little to be useful. */
+.guide-page.is-large-player {
+  overflow-y: auto;
+}
+
+.preview-section.is-large .preview-detail {
+  display: none;
+}
+
+.preview-section.is-large {
+  padding-bottom: 20px;
+  justify-content: center;
+}
+
+.preview-section.is-large .preview-video-wrap {
+  width: min(100%, calc((100vh - var(--page-header-h, 56px) - 36px) * 16 / 9));
+}
+
+.guide-page.is-large-player .guide-section {
+  min-height: 240px;
+}
+
+.preview-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: visible;
+}
+
+.preview-video::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05) 1px, transparent 1px, transparent 3px);
+}
+
+.preview-video-play {
+  color: var(--accent);
+  font-size: calc(40px * var(--font-scale));
+  opacity: 0.8;
+  z-index: 1;
+}
+
+/* Guide section ---------------------------------------------------------- */
+
+.guide-section {
+  flex: 1;
+  min-height: 0;
+  min-width: 0; /* flex items default to min-width:auto, which lets the
+    grid's intrinsic width bust containment and scroll the whole page
+    instead of just .guide-scroll below — this is the fix. */
+  margin: 0 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--surface);
+  overflow: hidden;
+  position: relative; /* contains the first-run StartupNotice overlay */
+}
+
+/* Single container scrolls both axes: the head row is sticky top, each
+   row's first cell is sticky left, so both stay put together. */
+.guide-scroll {
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* Fix: scrolling back to the top/left could leave the frozen header
+     row/column visually offset ("stuck" behind the edge). Scroll
+     anchoring was re-adjusting position when the ResizeObserver-driven
+     column width recalculated; disabling it stops that fight. */
+  overflow-anchor: none;
+}
+
+/* The red box on the selected slot is the intended focus indicator;
+   suppress the browser's default ring on the scroll container itself. */
+.guide-scroll:focus {
+  outline: none;
+}
+
+.guide-head-row,
+.guide-row {
+  display: grid;
+  min-height: 68px;
+  /* A block-level grid container's auto width normally fills its
+     containing block (.guide-scroll's viewport), not its own explicit
+     grid-template-columns sum — so with columns wider than the
+     viewport, the row's own box stayed viewport-width while only its
+     grid items visually overflowed past it. That undersized box is
+     what .guide-col-channel's position:sticky is actually contained
+     within, so it could only stay pinned for the first viewport-width
+     of horizontal scroll before running out of box to stick inside and
+     disappearing entirely. Sizing to the tracks' real content width
+     keeps that containing box — and therefore the sticky channel
+     column/header cell — valid across the whole scrollable range.
+     min-width keeps a short/narrow schedule still filling the visible
+     width instead of leaving a gap. */
+  width: max-content;
+  min-width: 100%;
+}
+
+.guide-head-row {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--surface);
+  font-family: var(--heading-font);
+  color: var(--heading-color);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--letter-spacing);
+  font-size: calc(13px * var(--font-scale));
+  border-bottom: 1px solid var(--border);
+  min-height: 40px;
+}
+
+.guide-head-slot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  /* Matches a box's left inset, so a show starting on the hour has its left edge
+     right under the hour's label. */
+  padding: 0 0 0 3px;
+}
+
+.guide-head-channel {
+  z-index: 4;
+}
+
+/* Higher specificity than .guide-col-channel's align-items:stretch below. */
+.guide-col-channel.guide-head-channel {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.guide-row:nth-child(even) {
+  background: var(--surface-alt);
+}
+
+.guide-col-channel {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface);
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+
+/* Real program durations are almost never exact multiples of
+   SLOT_MINUTES, so their start/span in "slot" units are fractional —
+   and a fractional grid-column-start/span is invalid CSS (the whole
+   declaration is dropped, not rounded), which used to silently fall
+   back every program to plain auto-placement: uniform-width boxes in
+   DOM order, overflowing into extra implicit rows once a row ran out
+   of explicit columns. Positioning each program with plain left/width
+   pixels inside this single relatively-positioned strip (one per
+   channel row) sidesteps integer-track grid math entirely. */
+.guide-row-timeline {
+  position: relative;
+  overflow: hidden;
+}
+
+.guide-channel-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 10px;
+}
+
+.guide-channel-num {
+  font-family: var(--heading-font);
+  font-weight: bold;
+  font-size: calc(14px * var(--font-scale));
+}
+
+.guide-channel-row-name {
+  color: var(--text-muted);
+  font-size: calc(12px * var(--font-scale));
+  font-weight: var(--body-weight, normal);
+  overflow: hidden;
+  overflow-wrap: break-word;
+  /* Wrapped names stay within the row height instead of growing it. */
+}
+
+.guide-channel-rating {
+  color: var(--text-muted);
+  font-size: calc(12px * var(--font-scale));
+}
+
+.guide-slot-box {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  font-family: inherit;
+}
+
+.guide-row:nth-child(even) .guide-slot-box {
+  background: var(--bg);
+}
+
+.guide-slot-box:hover {
+  filter: brightness(1.15);
+}
+
+/* "Tuned" = what's actually driving the preview bar (like a real cable
+   box: this is what's "on"). Set by clicking, or pressing Enter/Space on
+   a keyboard-focused cell. */
+.guide-slot-box-tuned {
+  background: var(--now-highlight) !important;
+  color: var(--now-highlight-text);
+  border-color: var(--accent);
+}
+
+/* "Focused" = the arrow-key browsing cursor. Fixed red, deliberately not
+   theme-tinted, so it's always identifiable against the dark palette.
+   Independent of "tuned" — you can browse without changing what's on. */
+.guide-slot-box-focused {
+  outline: 3px solid #ff2020;
+  outline-offset: -3px;
+}
+
+.guide-slot-title {
+  font-weight: bold;
+  font-size: calc(13px * var(--font-scale));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-slot-episode {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-muted);
+  font-weight: var(--body-weight, normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-slot-box-tuned .guide-slot-episode {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.guide-slot-time {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-muted);
+  font-weight: var(--body-weight, normal);
+  /* Never wrap at the hyphen in "8:39am-8:54am" — this row must always
+     show its full, real start/end time on one line (it's what
+     requiredContentWidthPx sizes the box's minimum width around). */
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .guide-page {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .page-header-brand {
+    font-size: calc(18px * var(--font-scale));
+  }
+
+  .page-header-actions {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .page-header-control {
+    height: 44px;
+    min-width: 44px;
+    padding: 0 8px;
+  }
+
+  .preview-section {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .preview-detail {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .preview-detail-main {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .preview-description {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+    padding: 10px 0 0;
+  }
+
+  .preview-video-wrap {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .preview-section.is-large {
+    padding: 10px 12px 12px;
+  }
+
+  .preview-section.is-large .preview-video-wrap {
+    width: min(100%, calc((100dvh - var(--page-header-h, 56px) - 28px) * 16 / 9)) !important;
+  }
+
+  .guide-section {
+    margin: 0 10px 10px;
+  }
+}
+
+@media (pointer: coarse) {
+  .page-header-control {
+    height: 44px;
+    min-width: 44px;
+  }
+}
+
+.guide-slot-box-tuned .guide-slot-time {
+  color: inherit;
+  opacity: 0.85;
+}

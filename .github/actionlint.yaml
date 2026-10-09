@@ -1,0 +1,7 @@
+# GitHub made ubuntu-26.04 GA on 2026-09-17, but actionlint v1.7.12's
+# built-in hosted-runner list predates it. Filter only this verified label's
+# false positive; remove this exception when the pinned linter recognizes it.
+paths:
+  .github/workflows/*.{yml,yaml}:
+    ignore:
+      - '^label "ubuntu-26\.04" is unknown\.'

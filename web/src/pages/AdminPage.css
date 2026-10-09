@@ -1,0 +1,280 @@
+.admin-page {
+  min-height: 100vh;
+  max-width: 100%;
+  overflow-x: clip;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.admin-topbar {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Matches .admin-content's max-width so the tabs sit above the centered
+   content column, instead of hugging the left edge of a full-width bar. */
+.admin-topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.admin-back {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  flex-shrink: 0;
+}
+
+/* Server Settings: a vertical sidebar on the left of the content column on
+   laptops and desktops; compact windows use the hamburger menu instead. The
+   topbar widens to the same column so Back To Guide sits above the sidebar. */
+.admin-page-sidebar .admin-topbar-inner {
+  max-width: calc(var(--admin-sidebar-width) + 24px + 900px);
+}
+
+.admin-page-sidebar {
+  --admin-sidebar-width: 200px;
+}
+
+.admin-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  max-width: calc(var(--admin-sidebar-width) + 24px + 900px);
+  margin: 0 auto;
+}
+
+.admin-tabs {
+  position: sticky;
+  top: 0;
+  flex: 0 0 var(--admin-sidebar-width);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 48px;
+}
+
+.admin-mobile-nav {
+  display: none;
+  position: relative;
+}
+
+.admin-nav-toggle {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.admin-nav-toggle span {
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.admin-mobile-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 180px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.admin-mobile-menu button {
+  min-height: 44px;
+  padding: 8px 12px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+}
+
+.admin-mobile-menu button:hover,
+.admin-mobile-menu button[aria-current='page'] {
+  background: var(--surface-alt);
+  color: var(--accent);
+}
+
+.admin-tab {
+  flex: 0 0 auto;
+  text-align: left;
+  white-space: nowrap;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-family: var(--heading-font);
+  text-transform: var(--heading-transform);
+  letter-spacing: var(--letter-spacing);
+  font-size: var(--admin-control-size);
+}
+
+.admin-tab-active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: bold;
+}
+
+.admin-layout > .admin-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-content {
+  /* Top padding is deliberately larger than the bottom: every Admin
+     page dropped its <h2> title (the tab bar above already says which
+     section you're in), and this preserves the same overall gap under
+     the topbar that title used to take up. */
+  padding: 48px 24px 48px;
+  max-width: 900px;
+  /* Center the content column itself; text/cards within it stay
+     left-aligned as before. Shared by every Admin tab. */
+  margin: 0 auto;
+}
+
+/* Split-screen laptop windows use compact navigation instead of the sidebar. */
+@media (max-width: 1200px) {
+  .admin-topbar-inner {
+    align-items: center;
+    gap: 12px;
+  }
+
+  .admin-back {
+    min-height: 44px;
+  }
+
+  .admin-tabs {
+    display: none;
+  }
+
+  .admin-layout > .admin-content {
+    margin: 0 auto;
+  }
+
+  .admin-mobile-nav {
+    display: block;
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-topbar {
+    padding: 10px 12px;
+  }
+
+  .admin-content {
+    padding: 24px 12px 32px;
+  }
+}
+
+/* Admin dialogs and wide table content must never leave stale page-level
+   horizontal overflow after a portrait modal closes. Intentional horizontal
+   scrolling remains isolated to dedicated table regions and the guide. */
+@supports selector(html:has(.admin-page)) {
+  html:has(.admin-page),
+  body:has(.admin-page) {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+}
+
+/* The Logs tab fills the window: the page never scrolls, the log box does. */
+.admin-page-fit {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-page-fit .admin-topbar {
+  flex: 0 0 auto;
+}
+
+.admin-page-fit .admin-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-items: stretch;
+}
+
+.admin-page-fit .admin-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
+.admin-page-fit .admin-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Shared settings typography: one-point steps, respecting the user's text scale. */
+.admin-page {
+  --admin-title-size: calc(12pt * var(--font-scale));
+  --admin-control-size: calc(11pt * var(--font-scale));
+  --admin-body-size: calc(10pt * var(--font-scale));
+  font-size: var(--admin-body-size);
+}
+.admin-page :is(h1, h2, h3, h4, h5, h6) {
+  font-size: var(--admin-title-size);
+}
+.admin-page :is(button, .admin-btn, .admin-table th),
+.admin-page .admin-table thead :is(input, select, button),
+.admin-page .channel-editor .multi-select-button {
+  font-size: var(--admin-control-size);
+}
+.admin-page :is(input, select, textarea),
+.admin-page .admin-field-row > label,
+.admin-page .channel-editor :is(input, select),
+.admin-page .channel-editor .admin-field-row > label,
+.admin-page .folder-browser-selection {
+  font-size: var(--admin-control-size);
+}
+/* Filter controls have the same size as their header row. */
+.admin-page .admin-table thead :is(input, select, button) {
+  font-size: var(--admin-control-size);
+}
+.admin-page .restore-order-link { font-size: var(--admin-body-size); }
+/* Icon controls retain their glyph size instead of becoming text buttons. */
+.admin-page .admin-modal-close { font-size:22px; }
+/* Create/edit form copy and fields match the table-header size. */
+.admin-page .admin-modal,
+.admin-page .admin-modal :is(label, input, select, textarea, p, .multi-select-option, .included-paths label),
+.admin-page .admin-modal .admin-field-row > label,
+.admin-page .folder-browser {
+  font-size: var(--admin-control-size);
+}
+
+/* Self-service back navigation sits below branding, above the first settings card. */
+.settings-back-row { display: flex; justify-content: flex-start; margin-bottom: 20px; }

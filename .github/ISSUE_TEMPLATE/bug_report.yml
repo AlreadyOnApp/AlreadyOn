@@ -1,0 +1,74 @@
+name: Bug report
+description: Report a problem with AlreadyOn
+title: 'bug: '
+labels:
+  - type:bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please search existing issues first to
+        avoid duplicates.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: Tell us what you saw
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: AlreadyOn version / image tag
+      description: e.g. dev, latest, stable, or a specific commit/digest
+    validations:
+      required: false
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Docker/container
+        - Native installation
+        - Native (other OS)
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste relevant server/FFmpeg logs. Redact any secrets or personal file paths you don't want shared.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: area
+    attributes:
+      label: Affected area(s)
+      description: e.g. library scanning, channels/scheduling, playback, auth, web UI, container/CI
+    validations:
+      required: false
