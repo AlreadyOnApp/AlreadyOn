@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.lynchbros.alreadyon"
         minSdk = 26
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.1.19-dev"
+        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 20
+        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.19-dev"
     }
     buildTypes {
         debug { applicationIdSuffix = ".debug" }

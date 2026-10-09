@@ -1,0 +1,132 @@
+name: Publish Android Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/android/app/src/**'
+      - 'apps/android/**/*.gradle.kts'
+      - 'apps/android/gradle.properties'
+      - 'apps/android/gradle/**'
+      - 'apps/android/gradlew*'
+      - '.github/workflows/android-release.yml'
+      - 'scripts/ci/android-release.py'
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Publish a main candidate or promote a tested candidate without rebuilding
+        type: choice
+        options: [candidate, stable]
+        default: candidate
+        required: true
+      candidate_tag:
+        description: For stable only, exact tested YYYY-MM-DD-rcN tag
+        type: string
+        required: false
+permissions:
+  contents: read
+# All candidate publication and stable promotion share one writer.
+concurrency:
+  group: android-releases
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.operation == 'candidate')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release policy
+        run: python3 -m unittest discover -s scripts/ci -p test_android_release.py
+      - name: Allocate candidate version or verify completed rerun
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: python3 scripts/ci/android-release.py plan --sha "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+      - name: Require permanent maintainer signing credentials
+        if: steps.version.outputs.existing != 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for variable in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!variable}" ]; then
+              echo "::error::Missing repository signing secret: $variable. See docs/ANDROID_RELEASES.md."
+              exit 1
+            fi
+          done
+      - uses: actions/setup-java@v6
+        if: steps.version.outputs.existing != 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        if: steps.version.outputs.existing != 'true'
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
+      - name: Build release APK with candidate version
+        if: steps.version.outputs.existing != 'true'
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.tag }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          apps/android/gradlew -p apps/android --no-daemon :app:assembleRelease \
+            "-PandroidVersionName=$VERSION_NAME" "-PandroidVersionCode=$VERSION_CODE"
+      - name: Sign and verify release APK
+        if: steps.version.outputs.existing != 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          umask 077
+          keystore="$RUNNER_TEMP/android-release.keystore"
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          mkdir -p "$RUNNER_TEMP/android-assets"
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          "$tools/zipalign" -P 16 -f 4 apps/android/app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/android-aligned.apk"
+          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+            --out "$RUNNER_TEMP/android-assets/alreadyon-android.apk" "$RUNNER_TEMP/android-aligned.apk"
+          "$tools/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/android-assets/alreadyon-android.apk"
+      - name: Publish verified APK and provenance as a prerelease
+        if: steps.version.outputs.existing != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.sha }}
+          VERSION_NAME: ${{ steps.version.outputs.tag }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          python3 scripts/ci/android-release.py candidate --sha "$SOURCE_SHA" \
+            --tag "$VERSION_NAME" --version-code "$VERSION_CODE" --directory "$RUNNER_TEMP/android-assets"
+      - name: Summarize candidate
+        env:
+          CANDIDATE_TAG: ${{ steps.version.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: echo "Android candidate [$CANDIDATE_TAG](https://github.com/$REPOSITORY/releases/tag/$CANDIDATE_TAG)" >> "$GITHUB_STEP_SUMMARY"
+  stable:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.operation == 'stable'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Promote the selected tested candidate without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          python3 scripts/ci/android-release.py promote --tag "$CANDIDATE_TAG" | tee -a "$GITHUB_STEP_SUMMARY"
