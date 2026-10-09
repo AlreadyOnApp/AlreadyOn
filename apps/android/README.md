@@ -12,6 +12,8 @@ From this directory run `./gradlew :app:assembleDebug`. Install the generated de
 
 The application ID is `io.github.lynchbros.alreadyon`. Release signing and distribution belong to the maintainer. Native TV and automatic signed-update work are separate from the phone scaffold.
 
+In fullscreen landscape, swipe up to the next higher available channel or down to the next lower one. Each deliberate swipe changes one channel; the lineup ends do not wrap. Fullscreen, orientation, mute and quality stay unchanged. Subtitle Off or the selected language carries across channels when a matching track is available.
+
 ## Test
 
 Use an isolated server and check login/logout, profile permissions, guide navigation, tuning, program boundaries, track selection, rotation and background recovery. Verify physical-device playback independently of emulator behavior.

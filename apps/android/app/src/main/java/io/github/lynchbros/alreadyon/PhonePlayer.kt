@@ -1,6 +1,10 @@
 package io.github.lynchbros.alreadyon
 
+import android.content.res.Configuration
 import android.os.SystemClock
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -178,7 +182,25 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
     }
     val silent = state.muted
     fun interact(action: () -> Unit) { interaction++; visible = true; action() }
-    Box(modifier.background(Color.Black).clickable { visible = !visible }) {
+    val swipeEnabled = fullscreen && !pictureInPicture && !menu &&
+        LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val swipeThreshold = with(density) { 64.dp.toPx() }
+    // Wait for release and require deliberate travel; taps and short drags do not tune.
+    val swipeModifier = if (swipeEnabled) Modifier.pointerInput(model, swipeThreshold) {
+        var travel = 0f
+        detectVerticalDragGestures(
+            onDragStart = { travel = 0f },
+            onVerticalDrag = { change, amount -> change.consume(); travel += amount },
+            onDragCancel = { travel = 0f },
+            onDragEnd = {
+                if (kotlin.math.abs(travel) >= swipeThreshold) {
+                    interact { model.stepChannel(if (travel < 0f) 1 else -1) }
+                }
+                travel = 0f
+            },
+        )
+    } else Modifier
+    Box(modifier.background(Color.Black).then(swipeModifier).clickable { visible = !visible }) {
         state.playback?.let { playback ->
             NativeVideo(playback, model, Modifier.fillMaxSize(), state.paused,
                 if (state.muted) 0f else 1f, onPosition = { sourceTime = it }, onTap = { visible = !visible })

@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.lynchbros.alreadyon"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.1.17-dev"
+        versionCode = 19
+        versionName = "0.1.18-dev"
     }
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
