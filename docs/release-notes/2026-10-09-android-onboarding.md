@@ -1,3 +1,5 @@
+<!-- android-release -->
+
 ## Features
 
 - Connect phones, tablets and Google TVs to a server on your home network without typing its address. Previously connected servers appear first; automatic discovery searches for up to 30 seconds.
