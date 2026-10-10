@@ -1,5 +1,5 @@
 // Remote focus styling shared by TV buttons and guide cells.
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import androidx.compose.foundation.border
 import androidx.compose.runtime.*

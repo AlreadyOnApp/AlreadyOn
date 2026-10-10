@@ -299,6 +299,16 @@ class DocumentationPolicy(unittest.TestCase):
         self.assertEqual(docs(changes, lambda _: '// Explain the public contract here.\nexport const x = 1;'), [])
         self.assertEqual(len(docs(changes, lambda _: '// TODO\nexport const x = 1;')), 1)
 
+    def test_namespace_only_changes_do_not_require_source_comments(self):
+        changes = [('M', 'server/a.go'), ('M', 'apps/android/Main.kt'), ('M', 'docs/API.md')]
+        read_text = lambda _: 'package alreadyon\n'
+        read_diff = lambda name: (['"old/module/pkg"', '"new/module/pkg"'] if name.endswith('.go')
+                                  else ['package io.github.alreadyonapp.alreadyon',
+                                        'package io.github.alreadyonapp.alreadyon'])
+        self.assertEqual(docs(changes, read_text, read_diff), [])
+        read_diff = lambda _: ['"old/module/pkg"', '"new/module/pkg"', 'func changed() {}']
+        self.assertEqual(len(docs(changes[:1] + changes[2:], read_text, read_diff)), 1)
+
     def test_deleted_code_requires_docs_but_is_not_read(self):
         def unreadable(_):
             raise AssertionError('Deleted code must not be read')

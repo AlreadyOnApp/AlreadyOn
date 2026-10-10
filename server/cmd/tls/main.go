@@ -14,9 +14,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lynchbros/alreadyon/server/internal/config"
-	"github.com/lynchbros/alreadyon/server/internal/instancetls"
-	"github.com/lynchbros/alreadyon/server/internal/storage"
+	"github.com/alreadyonapp/alreadyon/server/internal/config"
+	"github.com/alreadyonapp/alreadyon/server/internal/instancetls"
+	"github.com/alreadyonapp/alreadyon/server/internal/storage"
 )
 
 func main() {

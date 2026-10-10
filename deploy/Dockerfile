@@ -15,9 +15,9 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY server/ .
 # Runtime paths are fixed at link time; -s -w removes linker/debug tables that
 # the application does not read while retaining normal Go panic stack traces.
-ARG LDFLAGS="-X github.com/lynchbros/alreadyon/server/internal/config.dataDir=/config \
-    -X github.com/lynchbros/alreadyon/server/internal/config.webDir=/usr/local/share/alreadyon/web \
-    -X github.com/lynchbros/alreadyon/server/internal/httpapi.openAPISpecPath=/usr/local/share/alreadyon/openapi.yaml"
+ARG LDFLAGS="-X github.com/alreadyonapp/alreadyon/server/internal/config.dataDir=/config \
+    -X github.com/alreadyonapp/alreadyon/server/internal/config.webDir=/usr/local/share/alreadyon/web \
+    -X github.com/alreadyonapp/alreadyon/server/internal/httpapi.openAPISpecPath=/usr/local/share/alreadyon/openapi.yaml"
 ENV CGO_ENABLED=0 GOAMD64=v1
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -ldflags "$LDFLAGS -s -w" -o /out/alreadyon-server ./cmd/server \

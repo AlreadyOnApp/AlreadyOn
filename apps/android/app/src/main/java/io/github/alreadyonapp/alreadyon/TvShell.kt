@@ -1,4 +1,4 @@
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusable
