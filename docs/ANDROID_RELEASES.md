@@ -2,26 +2,26 @@
 
 [![AlreadyOn](../web/public/branding/header-doc.svg)](../README.md)
 
-## Approved release policy
+## Release lifecycle
 
-Ordinary `dev` and `test` builds validate source without creating a GitHub release or Git tag. Releases follow an explicitly selected full commit SHA. Select the latest approved `dev` commit for promotion; cherry-pick the selected change set into the destination branch rather than including unrelated work. Record both the selected source SHA and destination SHA because cherry-picking changes commit identity.
+Use one checkout: `python3 scripts/work.py start build` refreshes local `build` from `dev` without losing unique commits. Test at <https://localhost:5173>; then `python3 scripts/work.py publish [YYYY-MM-DD]` pushes the date branch/tag and opens its dev PR. The date is local test completion in America/New_York.
 
 | Promotion | Release tag | Publication |
 | --- | --- | --- |
-| Selected `dev` commit into `test` | `YYYY-MM-DD-rcN` | Signed release candidate; GitHub prerelease |
-| Tested release from `test` into `main` | `YYYY-MM-DD-beta` | Beta; GitHub prerelease |
-| Tested beta approved as stable | `YYYY-MM-DD-stable` | Stable; marked latest |
+| Merged date PR into `dev` | `YYYY-MM-DD-alphaN` | Fresh signed APKs and image tagged `nightly` plus `YYYY-MM-DD` |
+| Fast-forward tested date commit from `dev` to `test` | `YYYY-MM-DD-RCN` | Retag image `latest`; publish/copy tested APK bytes |
+| Fast-forward current `test` to `main` | `YYYY-MM-DD-Stable` | Retag image `stable`; publish the latest RC APK bytes |
 
-The RC date is the promotion date in America/New_York. RC numbering starts at `rc1` and advances past occupied tags and drafts for that date. The beta date is its publication date in America/New_York, with one unnumbered beta per date; stable retains the beta date. For example, `2026-10-09-rc3` can become `2026-10-10-beta`, then `2026-10-10-stable`.
+Start at alpha1; each dev hotfix increments alpha until RC1. RC1 reuses alpha APK bytes. Later dev hotfixes build a draft for the next RC; test promotion publishes it. RC changelogs include only marked app notes since the prior stage. Stable reuses the latest RC APKs and locks the date.
 
-Each beta changelog includes release-note files changed since the latest published Android release from an earlier date. Stable promotion retains the tested APK bytes, signatures, checksums, source provenance and changelog; do not rebuild or re-sign. Cherry-picked source must correspond to the tested release; validate that mapping before publication. Published assets are immutable: a changed same-day candidate requires deleting that date’s beta release and tag before recreating the same tag. Keep all earlier-date releases and tags intact. Reruns for the same source verify existing assets; failed uploads remain recoverable drafts.
+After dev e2e passes, the plain date tag advances to that merge. Alpha changelogs include marked Android/TV notes since the latest earlier-date Android release, excluding server-only notes. Promotions reuse the tested image digest and signed APKs; no rebuild/re-sign occurs. Earlier dates remain intact.
 
-Each release attaches `alreadyon-android.apk`, `alreadyon-tv.apk`, `SHA256SUMS` and `android-release.json`. The RC’s Android `versionName` and increasing `versionCode` remain embedded during promotion; renaming a GitHub release does not change installed APK versions. Changing a release title alone does not rename its Git tag.
+Each release attaches both APKs, `SHA256SUMS` and `android-release.json`. Promotions retain the APK `versionName`/`versionCode`; changing a release title does not rename its tag.
 
-## Automation
+## Automation and gates
 
-The workflow publishes a signed `YYYY-MM-DD-beta` from `main` and supports direct stable promotion without rebuilding the selected APKs. A source/tag mismatch fails closed; same-day replacement requires explicit release and tag deletion before rerunning.
+Dev PRs run quality, CodeQL and full Go/browser e2e. Dev merges rerun release validation, publish `nightly`/date tags and alpha APKs, then delete the merged date branch. The fast-forward-only commands `python3 scripts/promote.py test YYYY-MM-DD` and `python3 scripts/promote.py main` require tested image/APK provenance and do not rerun e2e. Stop if branch protection rejects a promotion; never bypass it.
 
 ## Signing and scope
 
-Use the permanent credentials described in [Android signing](ANDROID_SIGNING.md). The mobile and [TV](GOOGLE_TV.md) APKs share signing and release provenance. Debug apps use separate installation identities. Physical phone/tablet and TV validation remains required. [Release notes](RELEASE_NOTES.md) describe user-visible changes. Server deployment and Docker publication follow [delivery](CI_CD.md).
+Phone/tablet and [TV](GOOGLE_TV.md) APKs share permanent signing credentials and provenance. Debug apps use separate identities; validate physical devices. See [signing](ANDROID_SIGNING.md), [release notes](RELEASE_NOTES.md) and [delivery](CI_CD.md).

@@ -4,11 +4,13 @@
 
 The maintainer controls release gates. Checkout ownership and deployment credentials belong in ignored `.private/AGENTS.md`.
 
-## Development
+## Development and releases
 
-Commit changes and preview them. Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py`. Lint includes public-guide length and link checks. Update contracts when behavior changes.
+Use one checkout, local `build`, and preview at `https://localhost:5173`. A date-named dev PR runs quality, CodeQL, Go tests and full browser e2e. After merge, release validation republishes the date image/`nightly`, advances the date tag, builds Android alpha artifacts, and deletes the merged date branch. Hotfixes reuse that date and repeat the PR gates.
 
-Documentation checks include the latest commit and pending edits by default. CI supplies `CI_BASE` for the complete push/PR diff. Ordinary dev/test builds create no GitHub releases or Git tags.
+Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py` locally. Lint includes public-guide length and link checks. Update contracts when behavior changes.
+
+Documentation checks include pending edits; CI supplies `CI_BASE` for the full diff. Dev publication tags the release date; test/main reuse tested artifacts.
 
 ## Approved release validation
 
@@ -20,24 +22,24 @@ Documentation checks include the latest commit and pending edits by default. CI 
 4. Full synthetic browser suite (`make test-e2e`).
 5. Disposable packaged-runtime checks (`make test-container`).
 
-Go regressions copy source into temporary storage, excluding local databases, credentials and media. Packages run sequentially; multicore accounting checks do not assume minimum throughput from shared runners.
+Go tests use temporary source/storage, excluding local databases, credentials and media. Packages run sequentially.
 
 Resolve failures before promotion. Record the commit, image ID/digest and actual results. Live checks are non-destructive; synthetic suites use isolated data.
 
-Before image builds, `scripts/local-bases.py` checks recipe, parent and age. Missing, invalid or seven-day-old bases rebuild. CI refresh pulls toolchains separately, preserving the pinned runtime parent. `make refresh-local-bases` explicitly forces refresh; there is no schedule.
+Before image builds, `scripts/local-bases.py` checks base recipes, parent and age; stale/missing bases rebuild. `make refresh-local-bases` forces refresh.
 
 ## Delivery
 
 On approval, deploy the exact tested image and verify revision, health, service count, mounts and relevant playback. `scripts/deploy-production.sh <ssh-host> [compose-directory]` transfers it with the updater paused. Preserve live data.
 
-Select a full source SHA for release and cherry-pick its approved changes into the destination branch, recording both SHAs. Promotion to test creates a dated RC; test-to-main retains that date for an unnumbered beta; later approval creates stable. Preserve tested artifacts and changelogs. See [Android policy](ANDROID_RELEASES.md). Update issues after verified delivery.
+After alpha approval run `python3 scripts/promote.py test YYYY-MM-DD`; after RC approval run `python3 scripts/promote.py main`. These are guarded fast-forwards requiring image/APK provenance; they retag/reuse artifacts without e2e reruns. Stop on divergence or branch-protection rejection.
 
-Hosted image builds and promotions remain manual. See [retention](IMAGE_RETENTION.md) and [deployment](../deploy/README.md).
+Dev image builds run after validated date PR merges. Test/main image promotions run after the guarded fast-forward. See [retention](IMAGE_RETENTION.md) and [deployment](../deploy/README.md).
 
 ## Public automation
 
-Source Validation uses read-only credentials. Its Go job builds the production media base locally with shared caching and no publication credentials. Ubuntu's stock FFmpeg 8.0.x ignores initial burst pacing; the production recipe includes the fix.
+Source Validation uses read-only credentials. PRs build patched runtime/CI images locally; no publication credentials are exposed.
 
-CodeQL analyzes Go/TypeScript. Pages publishes documentation from main. Android automation still uses numbered beta publication on main and needs updating to the [approved promotion policy](ANDROID_RELEASES.md).
+CodeQL analyzes Go/TypeScript on dev/test/main; Pages publishes from main. Android automation builds alpha on dev, RC on test and Stable from RC artifacts on main; see [Android policy](ANDROID_RELEASES.md).
 
 New images use `ghcr.io/alreadyonapp/alreadyon`. Go module and Android package identities stay compatible. **Refresh Base Images** rebuilds shared bases on the selected branch; CI bases pin their runtime digest. Hosted application builds resolve both digests without rebuilding during promotion.

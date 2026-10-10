@@ -2,9 +2,9 @@
 name: Source Validation
 on:
   push:
-    branches: [build, dev, test, main]
+    branches: [dev]
   pull_request:
-    branches: [build, dev, test, main]
+    branches: [dev]
   workflow_dispatch:
 permissions:
   contents: read
@@ -43,5 +43,12 @@ jobs:
             FFMPEG_BUILD_JOBS=2
           cache-from: type=gha,scope=source-validation-runtime
           cache-to: type=gha,mode=max,scope=source-validation-runtime
-      - name: Server regression tests with production media runtime
-        run: CONTAINER_ENGINE=docker scripts/test-go-runtime.sh alreadyon-validation:runtime
+      - name: Build local CI tooling image on the patched runtime
+        run: docker build --file deploy/ci-base.Dockerfile --target ci-base \
+          --build-arg RUNTIME_BASE=alreadyon-validation:runtime \
+          --tag alreadyon-validation:ci .
+      - name: Go regression and full browser e2e tests
+        uses: ./.github/actions/test-source
+        with:
+          ci-base: alreadyon-validation:ci
+          pull-base: 'false'

@@ -18,6 +18,7 @@ def load(name, directory=None):
 
 policy = load('branch-policy')
 work = load('work', Path(__file__).parents[1])
+promote = load('promote', Path(__file__).parents[1])
 
 
 class PromotionGraphs(unittest.TestCase):
@@ -80,6 +81,15 @@ class PromotionGraphs(unittest.TestCase):
         self.assertEqual(policy.promotion_source(selected, selected), selected)
         policy.validate_promotion('main', selected, selected, selected)
 
+    def test_fast_forward_promotion_only_accepts_tested_ancestry(self):
+        older = self.commit('old')
+        newer = self.commit('new')
+        promote.validate_fast_forward(older, newer, newer, 'test')
+        with self.assertRaisesRegex(ValueError, 'cannot fast-forward'):
+            promote.validate_fast_forward(newer, older, newer, 'test')
+        with self.assertRaisesRegex(ValueError, 'not in current'):
+            promote.validate_fast_forward(older, newer, older, 'main')
+
     def test_arbitrary_nonmerge_push_is_rejected(self):
         selected = self.commit('earlier snapshot')
         upstream = self.commit('current source')
@@ -102,6 +112,10 @@ class PromotionGraphs(unittest.TestCase):
     def test_issue_branch_conventions(self):
         for name in ['feature/enable_tls_support', 'bugfix/h.265_encode_failure']:
             policy.validate_work_branch(name, ['server/main.go', 'README.md'])
+        policy.validate_work_branch('2026-10-10', ['server/main.go', 'README.md'])
+        policy.validate_work_branch('2026-10-10', ['docs/RELEASE_NOTES.md'])
+        with self.assertRaisesRegex(ValueError, 'valid YYYY-MM-DD'):
+            policy.validate_work_branch('2026-02-30', ['server/main.go'])
         policy.validate_work_branch('docs/developer_howto', ['docs/DEVELOPMENT.md'])
         for name, files in [('fix/a', ['server/main.go']), ('docs/a', ['scripts/run.sh']),
                             ('feature/a', ['README.md'])]:
