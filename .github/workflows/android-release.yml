@@ -22,7 +22,7 @@ on:
         default: candidate
         required: true
       candidate_tag:
-        description: For stable only, exact tested YYYY-MM-DD-betaN tag (legacy rcN accepted)
+        description: For stable only, exact tested YYYY-MM-DD-beta tag (legacy numbered beta/rc accepted)
         type: string
         required: false
 permissions:

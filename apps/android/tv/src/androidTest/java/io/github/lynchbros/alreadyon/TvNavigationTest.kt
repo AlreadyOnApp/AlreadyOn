@@ -1,6 +1,5 @@
 package io.github.lynchbros.alreadyon
 
-import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -43,7 +42,6 @@ class TvNavigationTest {
             }
         }
         val manual = InstrumentationRegistry.getArguments().getString("entryMode") == "manual"
-        val startedAt = SystemClock.elapsedRealtime()
         try {
             compose.onAllNodes(hasClickAction() and (hasContentDescription("AlreadyOn") or hasAnyDescendant(hasContentDescription("AlreadyOn")))).assertCountEquals(0)
             fun exists(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
@@ -55,12 +53,17 @@ class TvNavigationTest {
                 node.performClick()
             }
             if (manual) {
-                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).assertDoesNotExist()
-                compose.waitUntil(35000) { exists("HTTPS server address") }
-                assertTrue("Manual entry follows the scan deadline", SystemClock.elapsedRealtime() - startedAt >= 29000)
-                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).assertTextContains("https://")
-                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).performTextReplacement("127.0.0.1:${bridge.localPort}")
-                compose.onNodeWithText("Enter your server’s HTTPS address.").assertExists()
+                val addressField = hasSetTextAction() and hasText("HTTPS server address")
+                compose.onNode(addressField).assertExists()
+                compose.onNode(addressField).assertTextContains("https://")
+                compose.onNodeWithText("Searching for local servers…", substring = true).assertExists()
+                compose.waitUntil(15000) {
+                    compose.onAllNodes(hasText("10.0.2.2:19900", substring = true)).fetchSemanticsNodes().isNotEmpty()
+                }
+                compose.onNode(addressField).assertExists()
+                compose.onNodeWithText("Searching for local servers…", substring = true).assertExists()
+                compose.onNode(addressField).performTextReplacement("127.0.0.1:${bridge.localPort}")
+                compose.onNodeWithText("Searching for local servers…", substring = true).assertExists()
                 device.pressBack() // Dismiss the TV keyboard.
                 click("Check Server")
             } else {

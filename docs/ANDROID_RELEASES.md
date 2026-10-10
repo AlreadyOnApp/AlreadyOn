@@ -12,15 +12,15 @@ Ordinary `dev` and `test` builds validate source without creating a GitHub relea
 | Tested release from `test` into `main` | `YYYY-MM-DD-beta` | Beta; GitHub prerelease |
 | Tested beta approved as stable | `YYYY-MM-DD-stable` | Stable; marked latest |
 
-The RC date is the promotion date in America/New_York. RC numbering starts at `rc1` and advances past occupied tags and drafts for that date. Only RC releases increment. Beta and stable retain the selected RC’s date, even when promotion happens later. For example, `2026-10-10-rc2` becomes `2026-10-10-beta`, then `2026-10-10-stable`.
+The RC date is the promotion date in America/New_York. RC numbering starts at `rc1` and advances past occupied tags and drafts for that date. The beta date is its publication date in America/New_York, with one unnumbered beta per date; stable retains the beta date. For example, `2026-10-09-rc3` can become `2026-10-10-beta`, then `2026-10-10-stable`.
 
-Promotion retains the tested APK bytes, signatures, checksums, source provenance and changelog. Do not rebuild or re-sign. Cherry-picked source must correspond to the tested release; validate that mapping before publication. A different candidate cannot overwrite an existing date’s beta or stable release. Reruns verify existing assets; failed uploads remain recoverable drafts.
+Each beta changelog includes release-note files changed since the latest published Android release from an earlier date. Stable promotion retains the tested APK bytes, signatures, checksums, source provenance and changelog; do not rebuild or re-sign. Cherry-picked source must correspond to the tested release; validate that mapping before publication. Published assets are immutable: a changed same-day candidate requires deleting that date’s beta release and tag before recreating the same tag. Keep all earlier-date releases and tags intact. Reruns for the same source verify existing assets; failed uploads remain recoverable drafts.
 
 Each release attaches `alreadyon-android.apk`, `alreadyon-tv.apk`, `SHA256SUMS` and `android-release.json`. The RC’s Android `versionName` and increasing `versionCode` remain embedded during promotion; renaming a GitHub release does not change installed APK versions. Changing a release title alone does not rename its Git tag.
 
-## Automation transition
+## Automation
 
-The policy above supersedes the previous numbered-beta policy. The checked-in workflow currently publishes `YYYY-MM-DD-betaN` on qualifying pushes to `main` and supports direct stable promotion. It still needs implementation changes for selected-SHA RC publication on promotion to `test`, unnumbered beta promotion to `main`, and beta-to-stable promotion. Documentation changes alone do not alter those triggers.
+The workflow publishes a signed `YYYY-MM-DD-beta` from `main` and supports direct stable promotion without rebuilding the selected APKs. A source/tag mismatch fails closed; same-day replacement requires explicit release and tag deletion before rerunning.
 
 ## Signing and scope
 
