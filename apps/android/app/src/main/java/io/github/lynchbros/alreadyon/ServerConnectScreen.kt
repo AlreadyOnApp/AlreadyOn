@@ -106,7 +106,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
         val discovery = TvDiscovery(context, found = { server ->
             val index = servers.indexOfFirst { it.origin == server.origin }
             if (index < 0) servers.add(server)
-            else if (server.origin != recent?.origin) servers[index] = server
+            else servers[index] = if (server.origin == recent?.origin) server.copy(name = "${server.name} (Recently connected)") else server
         }, failed = { error = it })
         onDispose { discovery.close() }
     }
