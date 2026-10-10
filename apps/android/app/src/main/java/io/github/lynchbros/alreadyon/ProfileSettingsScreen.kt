@@ -70,8 +70,14 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
     var processing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    fun selectSection(title: String) {
+        if (section != title) {
+            section = title
+            model.dismissNotice()
+        }
+    }
     fun enterSection(title: String) {
-        section = title
+        selectSection(title)
         scope.launch {
             // Sidebar changes mount a different card; wait for its target before transferring focus.
             cards.scrollToItem(0)
@@ -122,7 +128,7 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
                 sections.forEach { title ->
                     FilledTonalButton(onClick = { enterSection(title) }, modifier = Modifier.fillMaxWidth()
                         .focusRequester(sidebarFocus.getValue(title))
-                        .onFocusChanged { if (it.isFocused) section = title }
+                        .onFocusChanged { if (it.isFocused) selectSection(title) }
                         .onPreviewKeyEvent { event ->
                             if (event.key != Key.DirectionRight) false else {
                                 if (event.type == KeyEventType.KeyDown) enterSection(title)
@@ -184,7 +190,6 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
                     SettingsChoice("Default Language", language, profileLanguages) { language = it }
                 } }
                 localError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-                state.notice?.let { item { Text(it) } }
                 item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(modifier = Modifier.tvFocusOutline(), onClick = {
                         val savedSection = section
@@ -211,6 +216,7 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
                     }, enabled = changed && !state.busy && !processing && name.isNotBlank()) { Text("Save Changes") }
                     OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings, modifier = Modifier.tvFocusOutline()) { Text("Cancel") }
                 } }
+                state.notice?.let { item { Text(it) } }
             }
         }
     }
