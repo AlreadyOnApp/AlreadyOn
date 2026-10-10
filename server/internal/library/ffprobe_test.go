@@ -5,9 +5,27 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 )
+
+func TestSampleRateRejectsOverflowAndNegativeMetadata(t *testing.T) {
+	maxInt := int(^uint(0) >> 1)
+	for _, tc := range []struct {
+		raw  string
+		want int
+	}{
+		{"48000", 48000}, {"", 0}, {"-48000", 0}, {"not a rate", 0},
+		{strconv.FormatUint(uint64(maxInt)+1, 10), 0},
+		{"18446744073709551615", 0},
+	} {
+		probe := rawProbe{Streams: []rawStream{{CodecType: "audio", SampleRate: tc.raw}}}.toProbeResult()
+		if got := probe.Streams[0].SampleRate; got != tc.want {
+			t.Errorf("sample rate %q = %d, want %d", tc.raw, got, tc.want)
+		}
+	}
+}
 
 // requireFFmpeg skips the test if ffmpeg/ffprobe aren't on PATH, so this
 // suite degrades gracefully on a machine or CI image that hasn't

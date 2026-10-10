@@ -89,7 +89,9 @@ func (e *RootError) Error() string {
 
 func (e *RootError) Unwrap() error { return e.Err }
 
-// ValidateRoot checks one configured path. Failures are *RootError.
+// ValidateRoot checks one configured path. Failures are *RootError. The owner
+// chooses this boundary through owner-only settings or local configuration;
+// it cannot be confined to the old roots without preventing new root selection.
 func ValidateRoot(kind RootKind, configuredPath string) (ValidatedRoot, error) {
 	fail := func(p RootProblem, err error) (ValidatedRoot, error) {
 		return ValidatedRoot{}, &RootError{Kind: kind, Path: configuredPath, Problem: p, Err: err}
