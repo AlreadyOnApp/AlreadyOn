@@ -43,8 +43,8 @@ def main():
         binary = root / "server"
         # Compile private paths into this disposable binary, never into repository configuration.
         run("go", "build", "-o", str(binary), "-ldflags",
-            f"-X github.com/lynchbros/alreadyon/server/internal/config.dataDir={data} "
-            f"-X github.com/lynchbros/alreadyon/server/internal/config.webDir={ROOT / 'web/dist'}",
+            f"-X github.com/alreadyonapp/alreadyon/server/internal/config.dataDir={data} "
+            f"-X github.com/alreadyonapp/alreadyon/server/internal/config.webDir={ROOT / 'web/dist'}",
             "./cmd/server", cwd=ROOT / "server")
         with socket.socket() as sock:
             # Fail if occupied; never replace a live service for the fixture.
@@ -101,8 +101,8 @@ def main():
                 for apk in ("debug/tv-debug.apk", "androidTest/debug/tv-debug-androidTest.apk"):
                     run(adb, "-s", args.serial, "install", "-r", str(ROOT / "apps/android/tv/build/outputs/apk" / apk))
                 if args.interactive:
-                    run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.lynchbros.alreadyon.tv.debug")
-                    run(adb, "-s", args.serial, "shell", "am", "start", "-n", "io.github.lynchbros.alreadyon.tv.debug/io.github.lynchbros.alreadyon.MainActivity")
+                    run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.alreadyonapp.alreadyon.tv.debug")
+                    run(adb, "-s", args.serial, "shell", "am", "start", "-n", "io.github.alreadyonapp.alreadyon.tv.debug/io.github.alreadyonapp.alreadyon.MainActivity")
                     print(f"Manual emulator address after 30 seconds: https://10.0.2.2:{port}", flush=True)
                     print("Synthetic username: tv-fixture; TV PIN: 123456. The app accepts the server certificate automatically.", flush=True)
                     import hashlib
@@ -112,14 +112,14 @@ def main():
                     input("Press Enter to stop the disposable fixture: ")
                     return
                 for entry_mode in ("discovery", "manual"):
-                    run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.lynchbros.alreadyon.tv.debug")
+                    run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.alreadyonapp.alreadyon.tv.debug")
                     result = run(adb, "-s", args.serial, "shell", "am", "instrument", "-w", "-e", "serverPort", str(port),
-                        "-e", "entryMode", entry_mode, "-e", "class", "io.github.lynchbros.alreadyon.TvNavigationTest",
-                        "io.github.lynchbros.alreadyon.tv.debug.test/androidx.test.runner.AndroidJUnitRunner", capture=True)
+                        "-e", "entryMode", entry_mode, "-e", "class", "io.github.alreadyonapp.alreadyon.TvNavigationTest",
+                        "io.github.alreadyonapp.alreadyon.tv.debug.test/androidx.test.runner.AndroidJUnitRunner", capture=True)
                     print(result)
                     if args.screenshots:
                         args.screenshots.mkdir(parents=True, exist_ok=True)
-                        run(adb, "-s", args.serial, "pull", "/sdcard/Android/data/io.github.lynchbros.alreadyon.tv.debug/files/tv-guide.png", str(args.screenshots / f"tv-guide-{entry_mode}.png"))
+                        run(adb, "-s", args.serial, "pull", "/sdcard/Android/data/io.github.alreadyonapp.alreadyon.tv.debug/files/tv-guide.png", str(args.screenshots / f"tv-guide-{entry_mode}.png"))
                     if "OK (1 test)" not in result:
                         raise RuntimeError("TV instrumentation did not pass")
             finally:
@@ -129,7 +129,7 @@ def main():
                 except subprocess.TimeoutExpired:
                     process.kill(); process.wait()
                 # Saved sessions must not outlive the disposable fixture they identify.
-                run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.lynchbros.alreadyon.tv.debug")
+                run(adb, "-s", args.serial, "shell", "pm", "clear", "io.github.alreadyonapp.alreadyon.tv.debug")
 
 
 if __name__ == "__main__":

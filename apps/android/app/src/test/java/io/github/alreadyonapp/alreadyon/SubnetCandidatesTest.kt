@@ -1,5 +1,5 @@
 // Discovery stays within the local subnet and probes nearby addresses first.
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import org.junit.Assert.*
 import org.junit.Test

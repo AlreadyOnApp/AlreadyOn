@@ -13,7 +13,7 @@ def main():
     parser.add_argument('--sdk', type=Path, required=True)
     args = parser.parse_args()
     adb = [str(args.sdk / 'platform-tools/adb'), '-s', args.serial]
-    package = 'io.github.lynchbros.alreadyon.tv.debug'
+    package = 'io.github.alreadyonapp.alreadyon.tv.debug'
 
     def run(*words):
         return subprocess.check_output(adb + list(words), text=True, timeout=30)
@@ -127,7 +127,7 @@ def main():
     assert not any(n.get('package') == package for n in snapshot().iter('node')), 'Mini-player Back must exit the application'
     # Force-stop tests process death, preserving Keystore cookies and profile preferences.
     run('shell', 'am', 'force-stop', package)
-    run('shell', 'am', 'start', '-n', f'{package}/io.github.lynchbros.alreadyon.MainActivity')
+    run('shell', 'am', 'start', '-n', f'{package}/io.github.alreadyonapp.alreadyon.MainActivity')
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         restored = texts(snapshot())

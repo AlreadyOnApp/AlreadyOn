@@ -1,4 +1,4 @@
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import android.graphics.Paint
 import android.text.TextPaint

@@ -1,4 +1,4 @@
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*

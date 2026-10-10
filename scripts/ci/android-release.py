@@ -121,7 +121,7 @@ def digest(path):
 
 def verify_assets(directory, source=None):
     manifest = json.loads((directory / "android-release.json").read_text())
-    if manifest.get("package") != "io.github.lynchbros.alreadyon":
+    if manifest.get("package") != "io.github.alreadyonapp.alreadyon":
         raise ValueError("Unexpected Android application identity")
     if source is not None and manifest.get("source_sha") != source:
         raise ValueError("Candidate source revision does not match its tag")
@@ -241,7 +241,7 @@ def candidate(repo, tag, sha, code, directory):
     if parsed is None or parsed[1] not in {"alpha", "rc", "beta"} or not 0 < code <= 2100000000:
         raise ValueError("Invalid Android release version")
     manifest = {"source_sha": sha, "version_name": tag, "version_code": code,
-                "package": "io.github.lynchbros.alreadyon",
+                "package": "io.github.alreadyonapp.alreadyon",
                 "apk_sha256": digest(directory / ASSETS[0]),
                 "tv_apk_sha256": digest(directory / ASSETS[3])}
     (directory / ASSETS[2]).write_text(json.dumps(manifest, indent=2) + "\n")
