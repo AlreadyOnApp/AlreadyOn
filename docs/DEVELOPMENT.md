@@ -10,6 +10,10 @@ Install web dependencies with `cd web && npm ci`, then return to the repository 
 
 Use `make preview-status` and `make preview-stop` to inspect or stop this checkout's services. The default backend port is 15900. Existing preview port overrides are supported by `scripts/preview.sh`; coordinate ports when running multiple instances.
 
+## Single-checkout release work
+
+Use the primary repository checkout; do not create parallel worktrees. Begin with `python3 scripts/work.py start build`, which refreshes the local release branch from current `dev` only when its existing commits are already merged. Test locally at <https://localhost:5173>. When ready, run `python3 scripts/work.py publish [YYYY-MM-DD]` to push the date branch/tag and open the dev PR. Do not start another release date while one lacks Stable.
+
 Trust this instance's local certificate only on your development machine. Do not weaken remote TLS validation. Local data lives under ignored `server/data/`; keep it across restarts.
 
 ## Accounts and private configuration
