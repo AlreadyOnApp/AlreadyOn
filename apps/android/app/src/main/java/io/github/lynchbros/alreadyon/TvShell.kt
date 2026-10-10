@@ -8,7 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
@@ -25,6 +27,18 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var controlsSignal by remember { mutableIntStateOf(0) }
     var controlsVisible by remember { mutableStateOf(false) }
+    var region by remember { mutableStateOf("guide") }
+    var guideOnCurrent by remember { mutableStateOf(true) }
+    var guideReset by remember { mutableIntStateOf(0) }
+    val profileFocus = remember { FocusRequester() }
+    val activity = LocalContext.current as? Activity
+    fun returnToGuide() { region = "guide"; guideOnCurrent = true; guideReset++ }
+    fun guideBack() {
+        if (region == "guide") {
+            if (!guideOnCurrent) { guideOnCurrent = true; guideReset++ }
+            else if (state.channel != null) { region = "player"; controlsSignal++ } else activity?.finish()
+        } else activity?.finish()
+    }
     val focus = remember { FocusRequester() }
     val manager = LocalFocusManager.current
     val owner = LocalLifecycleOwner.current
@@ -43,9 +57,9 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
     }
     BackHandler(enabled = fullscreen || state.settings != null || state.profile != null) {
         when {
-            fullscreen -> { fullscreen = false; manager.clearFocus() }
+            fullscreen -> { fullscreen = false; returnToGuide(); manager.clearFocus() }
             state.settings != null -> model.closeSettings()
-            else -> model.changeProfile()
+            else -> guideBack()
         }
     }
     PhoneTheme {
@@ -53,11 +67,28 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
         Surface(Modifier.fillMaxSize(), color = palette.background, contentColor = palette.text) {
         Column(Modifier.fillMaxSize().padding(if (fullscreen) 0.dp else 24.dp)
             .onPreviewKeyEvent { event ->
-                if (!fullscreen) return@onPreviewKeyEvent false
+                if (!fullscreen) {
+                    if (state.profile == null || state.settings != null) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Back -> {
+                            if (event.type == KeyEventType.KeyUp) guideBack()
+                            return@onPreviewKeyEvent true
+                        }
+                        Key.DirectionUp, Key.DirectionDown -> if (region == "player") {
+                            if (event.type == KeyEventType.KeyDown) {
+                                if (event.key == Key.DirectionUp) { region = "profile"; profileFocus.requestFocus() }
+                                else returnToGuide()
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        else -> Unit
+                    }
+                    return@onPreviewKeyEvent false
+                }
                 when (event.key) {
                     Key.Back -> {
                         if (controlsVisible) false else {
-                            if (event.type == KeyEventType.KeyUp) { fullscreen = false; manager.clearFocus() }
+                            if (event.type == KeyEventType.KeyUp) { fullscreen = false; returnToGuide(); manager.clearFocus() }
                             true
                         }
                     }
@@ -69,7 +100,6 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                     Key.DirectionUp, Key.DirectionDown -> {
                         if (event.type == KeyEventType.KeyDown) {
                             if (!controlsVisible) { controlsVisible = true; controlsSignal++ }
-                            else manager.moveFocus(if (event.key == Key.DirectionDown) FocusDirection.Next else FocusDirection.Previous)
                         }
                         true
                     }
@@ -88,7 +118,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
             if (!fullscreen) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 PhoneBrand()
-                if (state.profile != null) ProfileMenu(state, model)
+                if (state.profile != null) ProfileMenu(state, model, Modifier.focusRequester(profileFocus).onFocusChanged { if (it.isFocused) region = "profile" })
             }
             if (!fullscreen) {
                 if (state.signedIn) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -107,21 +137,21 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                             horizontalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 20.dp)) {
                             PhonePlayer(state, model,
                                 if (fullscreen) Modifier.fillMaxSize() else Modifier.width(320.dp).fillMaxHeight(),
-                                fullscreen = fullscreen, tv = true, controlsSignal = controlsSignal,
-                                onControlsVisibility = { controlsVisible = it }, onFullscreen = { if (!fullscreen) model.unmute(); fullscreen = !fullscreen },
-                                onExitFullscreen = { fullscreen = false })
+                                fullscreen = fullscreen, tv = true, tvActive = fullscreen || region == "player", controlsSignal = controlsSignal,
+                                onControlsVisibility = { controlsVisible = it }, onFullscreen = { if (!fullscreen) model.unmute(); fullscreen = !fullscreen; if (fullscreen) controlsSignal++ else returnToGuide() },
+                                onExitFullscreen = { fullscreen = false; returnToGuide() })
                             if (!fullscreen) Column(Modifier.weight(1f).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("${state.channel.number} · ${state.channel.name}", style = MaterialTheme.typography.titleLarge)
                                 state.playback?.let { playback ->
                                     if (playback.seriesTitle.isNotBlank()) Text(playback.seriesTitle, style = MaterialTheme.typography.titleMedium)
                                     Text(playback.episodeLabel + playback.title, style = MaterialTheme.typography.titleMedium)
                                 }
-                                Text("Select a channel to watch fullscreen. Back returns to the guide.", color = palette.muted)
                             }
                         }
                     }
-                    if (!fullscreen) TvGuide(state, palette, Modifier.weight(1f)) { channel ->
-                        model.unmute(); model.watch(channel); fullscreen = true
+                    if (!fullscreen) TvGuide(state, palette, Modifier.weight(1f), resetSignal = guideReset,
+                        onChannelFocus = { id, current -> region = "guide"; guideOnCurrent = id == state.channel?.id && current }) { channel ->
+                        model.unmute(); model.watch(channel); fullscreen = true; controlsSignal++
                     }
                 }
             }

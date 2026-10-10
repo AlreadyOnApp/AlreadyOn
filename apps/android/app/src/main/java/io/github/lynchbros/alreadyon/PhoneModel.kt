@@ -24,7 +24,7 @@ import java.time.Instant
 /** Authorized media metadata is ephemeral and never saved in Android instance state. */
 internal data class PhonePlayback(val url: String, val title: String, val startMs: Long, val revision: Long, val hlsTargetMs: Long? = null, val capturedAt: Long = SystemClock.elapsedRealtime(), val requestedAt: Long = capturedAt,
     val seriesTitle: String = "", val episodeLabel: String = "", val mediaFileId: Long = -1, val sourceHeight: Int = 720,
-    val audioTracks: List<PhoneTrack> = emptyList(), val subtitleTracks: List<PhoneTrack> = emptyList(),
+    val selectedAudioIndex: Int? = null, val audioTracks: List<PhoneTrack> = emptyList(), val subtitleTracks: List<PhoneTrack> = emptyList(),
     val streamOffsetSeconds: Double = 0.0, val hlsOriginMs: Long? = null, val bypassTls: Boolean = false, val trustedCa: String? = null)
 internal data class PhoneState(
     val username: String = "", val role: String = "viewer", val mustChangePassword: Boolean = false,
@@ -358,6 +358,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
                                 "S${it.optInt("seasonNumber").toString().padStart(2, '0')}E${it.optInt("episodeNumber").toString().padStart(2, '0')} - "
                             }.orEmpty(),
                             mediaFileId = tune.optLong("mediaFileId", -1), sourceHeight = tune.optInt("sourceHeight", 720),
+                            selectedAudioIndex = tune.getJSONObject("plan").optInt("audioTrackIndex", -1).takeIf { it >= 0 },
                             audioTracks = phoneTracks(tune.optJSONArray("audioTracks")), subtitleTracks = phoneTracks(tune.optJSONArray("subtitles")),
                             streamOffsetSeconds = if (direct) 0.0 else tune.optDouble("streamOffsetSeconds"),
                             bypassTls = state.value.bypassTls, trustedCa = state.value.trustedCa, hlsOriginMs = tune.optString("hlsOrigin").takeIf { it.isNotBlank() }?.let { Instant.parse(it).toEpochMilli() })

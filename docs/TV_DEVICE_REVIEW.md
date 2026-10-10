@@ -1,6 +1,6 @@
 # TV device review
 
-Use an explicitly selected physical TV. Install `:tv:assembleDeviceReview` to measure the optimized, non-debuggable TV release configuration with the debug package/key; updates preserve its encrypted session. Debug builds are useful for instrumentation, but their timing and memory are not release measurements.
+Use an explicitly selected physical TV. Install `:tv:assembleDeviceReview` to measure the optimized, non-debuggable TV release configuration with the debug package/key; updates preserve its encrypted session. Its launcher label is **AlreadyOn TV Test**, distinct from the public app. Debug builds are useful for instrumentation, but their timing and memory are not release measurements.
 
 The release TV build enables shrinking and optimization. Start the signed-in guide, then run:
 
@@ -8,7 +8,7 @@ The release TV build enables shrinking and optimization. Start the signed-in gui
 python3 scripts/android/review-tv.py --serial DEVICE_SERIAL --sdk /path/to/Android/Sdk
 ```
 
-The driver uses only remote keys, verifies guide Up/Down and horizontal browsing, fullscreen entry, overlay focus, Settings and Back, then force-stops/restarts the app to verify session restoration. It never clears data, signs out, edits server settings or seeds a live database. A protected profile may require its profile PIN again after restart; account sign-in must persist.
+The driver uses only remote keys, verifies guide Up/Down and horizontal browsing, fullscreen entry, overlay focus, current submenu options, pause/resume, guide Back restoration, mini-player/profile focus and exit, then force-stops/restarts the app to verify session restoration. It never clears data, signs out, edits server settings or seeds a live database. A protected profile may require its profile PIN again after restart; account sign-in must persist.
 
 Separately measure navigation with `adb -s DEVICE_SERIAL shell dumpsys gfxinfo io.github.lynchbros.alreadyon.tv.debug reset`, exercise remote keys, then collect `dumpsys gfxinfo` and `dumpsys meminfo`. Record sample count and percentiles; frame time is not end-to-end key latency. Do not compare an instrumented/debug build with a release build as if code changes alone caused the difference.
 

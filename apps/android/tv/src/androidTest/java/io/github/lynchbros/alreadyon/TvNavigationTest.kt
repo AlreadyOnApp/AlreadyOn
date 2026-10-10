@@ -101,10 +101,17 @@ class TvNavigationTest {
             device.pressBack()
             val model = ViewModelProvider(compose.activity)[PhoneModel::class.java]
             compose.runOnIdle { model.setQuality(720); model.setSubtitle(null) }
+            fun controlFocused(label: String) = compose.onAllNodes(
+                (hasContentDescription(label) or hasAnyDescendant(hasContentDescription(label))) and isFocused()).fetchSemanticsNodes().isNotEmpty()
             val muted = false
             click("110")
             assertTrue("Fullscreen hides guide", !exists("CHANNEL"))
             compose.waitUntil(60000) { !exists("Preparing channel…") }
+            compose.waitUntil(10000) { controlFocused("Pause") }
+            device.pressDPadDown()
+            device.pressDPadUp()
+            compose.waitForIdle()
+            assertTrue("Vertical arrows retain transport focus", controlFocused("Pause"))
             // Reveal the hidden transport controls using only the remote.
             device.pressDPadDown()
             compose.waitUntil(10000) { compose.onAllNodes(hasContentDescription("Mute") or hasContentDescription("Unmute")).fetchSemanticsNodes().isNotEmpty() }
@@ -114,6 +121,8 @@ class TvNavigationTest {
             device.pressBack() // Hide controls before channel navigation.
             device.pressDPadRight()
             compose.waitUntil(60000) { model.state.value.channel?.number == 111 && model.state.value.playback != null }
+            compose.waitUntil(10000) { controlFocused("Pause") }
+            device.pressBack() // A newly tuned channel starts with the overlay focused.
             device.pressDPadLeft()
             compose.waitUntil(60000) { model.state.value.channel?.number == 110 && model.state.value.playback != null }
             compose.runOnIdle {
@@ -121,11 +130,29 @@ class TvNavigationTest {
                 assertEquals("Mute survives tuning", muted, model.state.value.muted)
                 assertNull("Subtitles remain off", model.state.value.subtitleIndex)
             }
+            compose.waitUntil(10000) { controlFocused("Pause") }
+            device.pressDPadRight(); device.pressDPadRight(); device.pressDPadCenter()
+            click("Quality")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("✓ 720p") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            device.pressBack() // Submenu to root menu.
+            click("Audio Tracks")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("✓ ", substring = true) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             device.pressBack()
+            click("Subtitles")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("✓ Off") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            device.pressBack(); device.pressBack(); device.pressBack(); device.pressBack()
             compose.waitUntil(10000) { exists("CHANNEL") }
-            compose.waitForIdle()
-            Thread.sleep(1000) // Allow the SurfaceView compositor to present the compact frame.
+            device.pressDPadDown()
+            device.pressBack() // Restore the current preview row.
+            compose.waitUntil(10000) { compose.onAllNodes(hasContentDescription("Channel 110: TV fixture 110") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            device.pressBack() // Focus the mini-player.
+            compose.waitUntil(10000) { controlFocused("Pause") }
+            device.pressDPadUp()
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Admin") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             device.takeScreenshot(java.io.File(instrumentation.targetContext.getExternalFilesDir(null), "tv-guide.png"))
+            device.pressBack() // Exit from profile/player without signing out.
+            compose.waitUntil(10000) { compose.activity.isFinishing }
+            return
         } finally {
             device.takeScreenshot(java.io.File(instrumentation.targetContext.getExternalFilesDir(null), "tv-last-state.png"))
             running = false; bridge.close()

@@ -184,10 +184,10 @@ class MainActivity : ComponentActivity() {
 
 /** Profile administration is separate from the account's Owner authorization. */
 @Composable
-internal fun ProfileMenu(state: PhoneState, model: PhoneModel) {
+internal fun ProfileMenu(state: PhoneState, model: PhoneModel, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { open = true }) { ProfileName(state.profile!!, model) }
+        TextButton(onClick = { open = true }, modifier = modifier) { ProfileName(state.profile!!, model) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text("Switch Profile") }, onClick = { open = false; model.changeProfile() })
             if (!BuildConfig.IS_TV) DropdownMenuItem(text = { Text("Profile Settings") }, onClick = { open = false; model.openSettings("profile") })
