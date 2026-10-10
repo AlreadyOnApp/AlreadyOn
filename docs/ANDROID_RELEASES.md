@@ -12,7 +12,9 @@ Each release attaches `alreadyon-android.apk`, `alreadyon-tv.apk`, `SHA256SUMS` 
 
 After device testing, run **Publish Android Release** on `main`, choose `stable`, and enter the exact tested candidate tag. This explicit dispatch approves promotion. The workflow verifies its source is on main and checks downloaded asset hashes, then creates `YYYY-MM-DD-stable` at the candidate's commit with identical assets. It never rebuilds or re-signs. The embedded APK version remains `YYYY-MM-DD-rcN`, so devices already running that candidate need no update. The stable release is marked latest. Existing published assets cannot be overwritten; only one distinct stable APK may use a given date.
 
-You can dispatch `candidate` on main to retry or publish the current source. Dispatches on other branches do not publish. GitHub concurrency serializes the release writer; during a burst, GitHub may replace a pending run with a newer pending run. Maintainers should promote completed changes deliberately rather than rely on every intermediate push producing an APK.
+Dispatch `candidate` on main to retry publication. Other branches cannot publish. Release writers are serialized; promote completed changes deliberately.
+
+Release descriptions use reviewed [user-facing changelog entries](RELEASE_NOTES.md), grouped into Features, Improvements and Bug fixes. Candidates include changes since the last reachable stable release; stable promotion preserves the tested candidate’s notes. Build details are collapsed below download links.
 
 ## Signing and platform scope
 

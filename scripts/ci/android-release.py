@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import time
 from zoneinfo import ZoneInfo
+from release_notes import changelog, published_changelog, release_body
 
 RC = re.compile(r"(\d{4}-\d{2}-\d{2})-rc([1-9]\d*)\Z")
 ASSETS = ("alreadyon-android.apk", "SHA256SUMS", "android-release.json", "alreadyon-tv.apk")
@@ -147,12 +148,9 @@ def candidate(repo, tag, sha, code, directory):
     (directory / ASSETS[1]).write_text("".join(
         f"{digest(directory / name)}  {name}\n" for name in (ASSETS[0], ASSETS[2], ASSETS[3])))
     verify_assets(directory, sha)
-    notes = (f"Android mobile and Google TV release candidate `{tag}`.\n\n"
-             f"Source commit: `{sha}`\n\nAndroid versionCode: `{code}`\n\n"
-             "Signed release package: `io.github.lynchbros.alreadyon`. "
-             "The developer `.debug` app remains a separate installation.\n\n"
-             "Test mobile and Google TV builds on devices before stable promotion. "
-             "Checksums and source provenance are attached.\n")
+    stable_tags = [entry['tag_name'] for entry in releases(repo)
+                   if not entry['draft'] and not entry['prerelease']]
+    notes = release_body(repo, tag, sha, code, changelog(sha, stable_tags))
     publish(repo, tag, sha, directory, notes, True)
 
 
@@ -173,10 +171,8 @@ def promote(repo, tag):
         if manifest["version_name"] != tag:
             raise ValueError("Candidate manifest version does not match the selected tag")
         stable = f"{match[1]}-stable"
-        notes = (f"Stable Android mobile and Google TV release promoted from `{tag}`.\n\n"
-                 f"Source commit: `{sha}`\n\n"
-                 "Assets are byte-for-byte copies of the tested candidate; nothing was rebuilt "
-                 "or re-signed. The APK's embedded version name remains the candidate version.\n")
+        notes = release_body(repo, stable, sha, manifest['version_code'],
+                             published_changelog(release.get('body') or ''), tag)
         publish(repo, stable, sha, directory, notes, False)
         print(f"Published {stable} from {tag}")
 
