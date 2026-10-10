@@ -24,7 +24,7 @@ Go regressions copy tracked source and non-ignored additions into temporary stor
 
 Resolve failures before promotion. Record the commit, image ID/digest and actual results. Live checks are non-destructive; synthetic suites use isolated data.
 
-Before image builds, `scripts/local-bases.py` checks recipe, parent and age. Missing, invalid or seven-day-old bases rebuild. `make refresh-local-bases` explicitly forces refresh; there is no schedule.
+Before image builds, `scripts/local-bases.py` checks recipe, parent and age. Missing, invalid or seven-day-old bases rebuild. CI refresh pulls remote toolchains separately while retaining its pinned local runtime parent. `make refresh-local-bases` explicitly forces refresh; there is no schedule.
 
 ## Delivery
 
