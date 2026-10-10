@@ -22,6 +22,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.input.key.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +76,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     var error by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(false) }
     var pin by remember { mutableStateOf("") }
+    var pinVisible by remember { mutableStateOf(false) }
     var username by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("https://") }
     var manualEntry by remember { mutableStateOf(false) }
@@ -158,17 +166,19 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     }, enabled = !state.busy)
                 Text("Enter your 6–12 digit TV PIN")
                 if (!BuildConfig.IS_TV) OutlinedTextField(pin, { pin = it.filter { digit -> digit in '0'..'9' }.take(12) },
-                    label = { Text("TV PIN") }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                    label = { Text("TV PIN") }, singleLine = true,
+                    visualTransformation = if (pinVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PinVisibilityButton(pinVisible, !state.busy) { pinVisible = !pinVisible } },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
                 else OutlinedTextField(pin, {}, label = { Text("TV PIN") }, readOnly = true,
                     singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(0.6f).focusRequester(pinFocus).onFocusChanged {
                         if (it.isFocused) { keyboard?.hide(); pinKeypad = true }
                     }, enabled = !state.busy)
-                Button(modifier = Modifier.focusRequester(connectFocus).tvFocusOutline(), onClick = { model.signInWithPIN(selected!!.origin, username, pin, trust!!.certificate, trust!!.name); pin = "" },
+                Button(modifier = Modifier.focusRequester(connectFocus).tvFocusOutline(), onClick = { model.signInWithPIN(selected!!.origin, username, pin, trust!!.certificate, trust!!.name); pin = ""; pinVisible = false },
                     enabled = username.isNotBlank() && pin.length in 6..12 && !state.busy) { Text("Connect") }
             }
-            Button(modifier = Modifier.tvFocusOutline(), onClick = { selected = null; trust = null; pin = ""; error = null; model.dismissError() }, enabled = !checking && !state.busy) { Text("Choose Another Server") }
+            Button(modifier = Modifier.tvFocusOutline(), onClick = { selected = null; trust = null; pin = ""; pinVisible = false; error = null; model.dismissError() }, enabled = !checking && !state.busy) { Text("Choose Another Server") }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (BuildConfig.IS_TV) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -199,5 +209,22 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                 Button(onClick = { closePin() }, modifier = Modifier.tvFocusOutline()) { Text("✓ Done") }
             }
         }
+    }
+}
+
+/** Match the WebUI eye control without adding an icon library for two paths. */
+@Composable
+private fun PinVisibilityButton(visible: Boolean, enabled: Boolean, toggle: () -> Unit) {
+    val vector = remember(visible) {
+        val path = if (visible)
+            "M2.5 12C3.5 9.5 7 5 12 5S20.5 9.5 21.5 12C20.5 14.5 17 19 12 19S3.5 14.5 2.5 12Z M14.5 12A2.5 2.5 0 1 1 9.5 12A2.5 2.5 0 1 1 14.5 12"
+        else
+            "M3 3L21 21 M10.6 10.6A2 2 0 0 0 13.4 13.4 M9.9 5.2A10.8 10.8 0 0 1 12 5C17 5 20.5 9.5 21.5 12C21.1 13 20.3 14.1 19.2 15.1 M6.2 6.2C3.9 7.6 2.8 9.5 2.5 12C3.5 14.5 7 19 12 19C13.4 19 14.7 18.6 15.8 18"
+        ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+            .addPath(PathParser().parsePathString(path).toNodes(), stroke = SolidColor(Color.Black),
+                strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round).build()
+    }
+    IconButton(onClick = toggle, enabled = enabled) {
+        Icon(vector, contentDescription = if (visible) "Hide PIN" else "Show PIN")
     }
 }

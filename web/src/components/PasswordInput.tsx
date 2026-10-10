@@ -4,6 +4,7 @@ import './PasswordInput.css';
 
 type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
   allowAutofill?: boolean;
+  visibilityLabel?: string;
   /** Render as a masked text field so extensions such as Bitwarden, which ignore
    *  autocomplete hints, find no password field to fill on page load. */
   concealFromManagers?: boolean;
@@ -12,9 +13,9 @@ type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & 
 // Browsers without -webkit-text-security would show the text, so they keep type="password".
 const canMaskText = typeof CSS !== 'undefined' && CSS.supports?.('-webkit-text-security', 'disc');
 
-export function PasswordInput({ allowAutofill = false, concealFromManagers = false, ...props }: PasswordInputProps) {
+export function PasswordInput({ allowAutofill = false, concealFromManagers = false, visibilityLabel = 'Password', ...props }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
-  const toggleLabel = visible ? 'Hide Password' : 'Show Password';
+  const toggleLabel = `${visible ? 'Hide' : 'Show'} ${visibilityLabel}`;
   const masked = concealFromManagers && canMaskText && !visible;
   const type = visible || masked ? 'text' : 'password';
 
@@ -26,6 +27,7 @@ export function PasswordInput({ allowAutofill = false, concealFromManagers = fal
       <button
         className="password-input-toggle"
         type="button"
+        disabled={props.disabled}
         aria-label={toggleLabel}
         aria-pressed={visible}
         aria-controls={props.id}

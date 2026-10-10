@@ -1,4 +1,6 @@
 import SettingToggle from './SettingToggle';
+import TvPairingField from './TvPairingField';
+import { useTvPairing } from './useTvPairing';
 // The signed-in account: change its password and manage which browsers are
 // signed in, and rename it. A password change signs every other browser out; sessions can also
 // be ended one at a time, or all at once. The server-wide sign-in lifetime is
@@ -45,6 +47,7 @@ const LIFETIME_MESSAGE_MS = 5000;
 
 export default function AccountCard({ children }: { children: ReactNode }) {
   const { username, isOwner, passwordLocked, rename } = useAccount();
+  const pairing = useTvPairing();
   const [newName, setNewName] = useState(username);
   const renaming = newName.trim() !== username;
   // Fields start read-only so browser password managers (which ignore autocomplete="off")
@@ -155,8 +158,8 @@ export default function AccountCard({ children }: { children: ReactNode }) {
     setPasswordMessage(null);
     const changingPassword = next !== '' || confirm !== '';
     if (!newName.trim()) return setPasswordError('Enter a username.');
-    if (!renaming && !changingPassword) return setPasswordError('There are no changes to save.');
-    if (!current) return setPasswordError('Enter your current password to save changes.');
+    if (!renaming && !changingPassword && !pairing.pin) return setPasswordError('There are no changes to save.');
+    if ((renaming || changingPassword) && !current) return setPasswordError('Enter your current password to save changes.');
     if (changingPassword) {
       if (Array.from(next).length < MIN_PASSWORD) return setPasswordError(`The new password needs at least ${MIN_PASSWORD} characters.`);
       if (next !== confirm) return setPasswordError("The new passwords don't match.");
@@ -177,6 +180,7 @@ export default function AccountCard({ children }: { children: ReactNode }) {
         done.push('Password changed. Every other browser was signed out.');
         load();
       }
+      if (pairing.pin) { await pairing.save(); done.push('Changes saved.'); }
       setCurrent('');
       setPasswordMessage(done.join(' '));
     } catch (err) {
@@ -228,6 +232,7 @@ export default function AccountCard({ children }: { children: ReactNode }) {
   return (
     <>
     <div className="admin-card account-card">
+      <form autoComplete="off" onSubmit={(e) => void submitChanges(e)}>
       {passwordLocked ? (
         <>
           <div className="admin-field-row">
@@ -237,7 +242,7 @@ export default function AccountCard({ children }: { children: ReactNode }) {
           <p className="admin-section-hint">This account's password is locked. Only a server owner can change it.</p>
         </>
       ) : (
-      <form autoComplete="off" onSubmit={(e) => void submitChanges(e)}>
+      <>
         <div className="admin-field-row">
           <label htmlFor="account-current">Current Password</label>
           <PasswordInput concealFromManagers id="account-current" name="account-current" value={current} readOnly={!unlocked} onFocus={() => setUnlocked(true)} onChange={typed(setCurrent)} />
@@ -268,14 +273,16 @@ export default function AccountCard({ children }: { children: ReactNode }) {
           <label htmlFor="account-confirm">Confirm New Password</label>
           <PasswordInput concealFromManagers id="account-confirm" name="account-confirm" placeholder="Leave empty to keep current password" value={confirm} readOnly={!unlocked} onFocus={() => setUnlocked(true)} onChange={typed(setConfirm)} />
         </div>
+      </>
+      )}
+        <TvPairingField pairing={pairing} disabled={saving} />
         <div className="account-save-row">
-          <button className="admin-btn" type="submit" disabled={saving}>
+          <button className="admin-btn" type="submit" disabled={saving || pairing.busy}>
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
           {passwordError && <p className="profile-field-error" role="alert">{passwordError}</p>}
         </div>
       </form>
-      )}
       {passwordMessage && <p className="admin-section-hint" role="status">{passwordMessage}</p>}
 
     </div>
