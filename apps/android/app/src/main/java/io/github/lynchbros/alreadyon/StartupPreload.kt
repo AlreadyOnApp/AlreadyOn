@@ -1,6 +1,7 @@
 package io.github.lynchbros.alreadyon
 
 import android.os.SystemClock
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -27,7 +28,10 @@ internal fun StartupPreload(content: @Composable () -> Unit) {
                     while (true) awaitPointerEvent().changes.forEach { it.consume() }
                 }
             }, color = phonePalette.background) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { PhoneBrand() }
+                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    // Double the complete lockup, constrained only by narrow phone viewports.
+                    PhoneBrand(scale = minOf(2f, (maxWidth.value - 32f) / 224f).coerceAtLeast(1f))
+                }
             }
         }
     }

@@ -12,6 +12,6 @@ After the first profile selection or restoration, a static remote tutorial appea
 
 The optimized review APK is labeled **AlreadyOn TV Test**. Updating this package preserves its encrypted session; uninstalling removes it. See [device review](TV_DEVICE_REVIEW.md) for the physical remote checks.
 
-Routine background loading has no animated status bar on TV; refreshes keep the layout steady. Errors still appear when an operation fails.
+Background loading has no animated TV status bar; errors remain visible.
 
-TV and phone startup show the centered logo and tagline for two seconds while loading underneath; rotation retains the deadline. The TV guide removes branding, reserves profile-menu space and fits four rows without smaller fonts. Up/Down use identical short transitions to reveal clipped rows.
+TV and phone show centered double-size branding for two seconds while preloading; rotation retains the deadline. The TV guide removes branding, reserves profile-menu space and fits at least four rows. Cells use two-line height with a 13-point show title; the preview panel has extra top margin. Up/Down use identical short transitions to reveal clipped rows.
