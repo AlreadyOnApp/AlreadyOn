@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
@@ -108,6 +107,9 @@ func ProvisionTestAPIKey(ctx context.Context, db *sql.DB, name, raw string) (API
 		return key, err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM api_keys WHERE key_prefix='test-key' AND key_hash NOT LIKE '$argon2id$%'`); err != nil {
+		return key, err
+	}
 	id, previous, err := findTestingKey(ctx, tx, raw)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return key, err
@@ -131,7 +133,7 @@ type testingKeyQuerier interface {
 }
 
 // Testing keys have no public identifier; only explicitly provisioned local
-// testing records are candidates. Argon2 work shares the bounded password pool.
+// Argon2id records are candidates. Argon2 work shares the bounded password pool.
 func findTestingKey(ctx context.Context, db testingKeyQuerier, raw string) (int64, string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT id, key_hash FROM api_keys WHERE key_prefix='test-key' ORDER BY id`)
 	if err != nil {
@@ -149,14 +151,6 @@ func findTestingKey(ctx context.Context, db testingKeyQuerier, raw string) (int6
 		}
 		if strings.HasPrefix(hash, "$argon2id$") {
 			if VerifyPassword(hash, raw) {
-				return id, hash, nil
-			}
-		} else if len(hash) == sha256.Size*2 {
-			// Read-only compatibility with previously provisioned test keys.
-			// A successful authentication replaces this legacy hash with Argon2id;
-			// new provisioning never writes an unsalted testing-key digest.
-			sum := sha256.Sum256([]byte(raw))
-			if subtle.ConstantTimeCompare([]byte(hash), []byte(hex.EncodeToString(sum[:]))) == 1 {
 				return id, hash, nil
 			}
 		}
