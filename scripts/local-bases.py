@@ -6,6 +6,7 @@ import fcntl
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -83,8 +84,15 @@ def ensure(engine, refresh=False):
         if force or not matches(engine, current, recipe, runtime):
             file = 'deploy/base.Dockerfile' if kind == 'runtime' else 'deploy/ci-base.Dockerfile'
             target = 'runtime-base' if kind == 'runtime' else 'ci-base'
+            if force and runtime:
+                # Pull remote toolchains separately: always-pull rejects the pinned local runtime ID.
+                versions = dict(re.findall(r'^ARG (GO_VERSION|NODE_VERSION)=(\S+)$',
+                                           (ROOT / file).read_text(), re.M))
+                for name, version in (('golang', versions['GO_VERSION']), ('node', versions['NODE_VERSION'])):
+                    subprocess.run([engine, 'pull', f'docker.io/library/{name}:{version}'],
+                                   check=True, stdout=sys.stderr)
             command = [engine, 'build', '--format', 'docker', '--layers',
-                       '--pull=always' if force else '--pull=missing',
+                       '--pull=always' if force and not runtime else '--pull=missing',
                        '--label', f'io.alreadyon.base.recipe={recipe}',
                        '--label', f'io.alreadyon.base.built-at={now.isoformat()}',
                        '--file', file, '--target', target, '--tag', tag]

@@ -47,10 +47,13 @@ class LocalBaseTests(unittest.TestCase):
              patch.object(bases.keys, 'recipe_key', side_effect=lambda root, kind: kind + '-key'), \
              patch.object(bases.subprocess, 'run') as run:
             bases.ensure('podman')
-            self.assertEqual(run.call_count, 2)
-            for call in run.call_args_list:
-                self.assertIn('--no-cache', call.args[0])
-                self.assertIn('--pull=always', call.args[0])
+            self.assertEqual(run.call_count, 4)
+            builds = [call.args[0] for call in run.call_args_list if call.args[0][1] == 'build']
+            for command in builds:
+                self.assertIn('--no-cache', command)
+            self.assertIn('--pull=always', builds[0])
+            self.assertIn('--pull=missing', builds[1])
+            self.assertEqual([call.args[0][1] for call in run.call_args_list], ['build', 'pull', 'pull', 'build'])
 
     def test_expired_ci_keeps_fresh_runtime(self):
         runtime = image('runtime-id', 'runtime-key')
@@ -62,7 +65,9 @@ class LocalBaseTests(unittest.TestCase):
              patch.object(bases.keys, 'recipe_key', side_effect=lambda root, kind: kind + '-key'), \
              patch.object(bases.subprocess, 'run') as run:
             bases.ensure('podman')
-            run.assert_called_once()
+            self.assertEqual(run.call_count, 3)
+            self.assertEqual([call.args[0][1] for call in run.call_args_list], ['pull', 'pull', 'build'])
+            self.assertIn('--pull=missing', run.call_args.args[0])
             self.assertIn('ci-base', run.call_args.args[0])
             self.assertIn('--no-cache', run.call_args.args[0])
 
@@ -104,11 +109,14 @@ class LocalBaseTests(unittest.TestCase):
              patch.object(bases.keys, 'recipe_key', side_effect=lambda root, kind: kind + '-key'), \
              patch.object(bases.subprocess, 'run') as run:
             bases.ensure('podman', refresh=True)
-            self.assertEqual(run.call_count, 2)
-            for call in run.call_args_list:
-                self.assertIn('--no-cache', call.args[0])
-                self.assertIn('--pull=always', call.args[0])
-            self.assertIn('RUNTIME_BASE=runtime-id', run.call_args_list[1].args[0])
+            self.assertEqual(run.call_count, 4)
+            builds = [call.args[0] for call in run.call_args_list if call.args[0][1] == 'build']
+            for command in builds:
+                self.assertIn('--no-cache', command)
+            self.assertIn('--pull=always', builds[0])
+            self.assertIn('--pull=missing', builds[1])
+            self.assertEqual([call.args[0][1] for call in run.call_args_list], ['build', 'pull', 'pull', 'build'])
+            self.assertIn('RUNTIME_BASE=runtime-id', run.call_args_list[-1].args[0])
 
 
 if __name__ == '__main__':
