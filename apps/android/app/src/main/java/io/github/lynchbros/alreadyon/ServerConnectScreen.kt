@@ -79,7 +79,6 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     var pinVisible by remember { mutableStateOf(false) }
     var username by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("https://") }
-    var manualEntry by remember { mutableStateOf(false) }
     var remaining by remember { mutableIntStateOf(30) }
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -95,8 +94,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
         focusManager.clearFocus(force = true)
         if (username.isNotBlank() && pin.length in 6..12) connectFocus.requestFocus()
     }
-    LaunchedEffect(scan, manualEntry) {
-        if (manualEntry) return@LaunchedEffect
+    LaunchedEffect(scan) {
         remaining = 30
         while (remaining > 0) { delay(1000); remaining-- }
     }
@@ -109,8 +107,8 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
             finally { checking = false }
         }
     }
-    DisposableEffect(scan, remaining == 0, manualEntry, selected) {
-        if (remaining == 0 || manualEntry || selected != null) return@DisposableEffect onDispose {}
+    DisposableEffect(scan, remaining == 0, selected) {
+        if (remaining == 0 || selected != null) return@DisposableEffect onDispose {}
         val discovery = TvDiscovery(context, found = { server ->
             val index = servers.indexOfFirst { it.origin == server.origin }
             if (index < 0) servers.add(server)
@@ -126,8 +124,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
         if (selected == null) {
             Text("Connect to your AlreadyOn server", style = MaterialTheme.typography.headlineSmall)
             Text("Select a server on your home network.")
-            if (manualEntry) Text("Enter your server’s HTTPS address.")
-            else if (remaining > 0) Text("Searching for local servers… ${remaining}s remaining")
+            if (remaining > 0) Text("Searching for local servers… ${remaining}s remaining")
             else Text(if (servers.isEmpty()) "No local server found. Enter its HTTPS address below." else "Select a server or enter an HTTPS address below.")
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 servers.forEach { server ->
@@ -136,20 +133,18 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     }, enabled = !checking && !state.busy) { Text("${server.name} · ${server.origin.removePrefix("https://")}") }
                 }
             }
-            if (remaining == 0) {
-                OutlinedTextField(address, { address = it; manualEntry = true }, label = { Text("HTTPS server address") },
-                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
-                Button(modifier = Modifier.tvFocusOutline(), onClick = {
-                    val input = address.trim().let { if ("://" in it) it else "https://$it" }
-                    val origin = serverOrigin(input)?.toHttpUrl()?.let { url ->
-                        if (url.port == 443 && java.net.URI(input).port == -1) url.newBuilder().port(19900).build().toString().removeSuffix("/")
-                        else url.toString().removeSuffix("/")
-                    }
-                    if (origin == null) error = "Enter a valid HTTPS server address."
-                    else select(TvServer("AlreadyOn server", origin))
-                }, enabled = address.removePrefix("https://").isNotBlank() && !checking && !state.busy) { Text("Check Server") }
-            }
-            Button(modifier = Modifier.tvFocusOutline(), onClick = { servers.clear(); recent?.let { servers.add(it) }; error = null; manualEntry = false; remaining = 30; scan++ }) { Text("Rescan") }
+            OutlinedTextField(address, { address = it }, label = { Text("HTTPS server address") },
+                singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
+            Button(modifier = Modifier.tvFocusOutline(), onClick = {
+                val input = address.trim().let { if ("://" in it) it else "https://$it" }
+                val origin = serverOrigin(input)?.toHttpUrl()?.let { url ->
+                    if (url.port == 443 && java.net.URI(input).port == -1) url.newBuilder().port(19900).build().toString().removeSuffix("/")
+                    else url.toString().removeSuffix("/")
+                }
+                if (origin == null) error = "Enter a valid HTTPS server address."
+                else select(TvServer("AlreadyOn server", origin))
+            }, enabled = address.removePrefix("https://").isNotBlank() && !checking && !state.busy) { Text("Check Server") }
+            Button(modifier = Modifier.tvFocusOutline(), onClick = { servers.clear(); recent?.let { servers.add(it) }; error = null; remaining = 30; scan++ }) { Text("Rescan") }
         } else {
             Text("${selected!!.name} · ${selected!!.origin.removePrefix("https://")}", style = MaterialTheme.typography.headlineSmall)
             if (checking) Text("Checking server…")

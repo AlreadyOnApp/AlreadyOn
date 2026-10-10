@@ -1,6 +1,7 @@
 """Release policy tests use synthetic APK bytes and mocked GitHub operations."""
 import importlib.util
 import json
+from datetime import datetime
 from pathlib import Path
 import tempfile
 import unittest
@@ -34,14 +35,61 @@ class AndroidReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "TV APK checksum"):
                 release.verify_assets(directory)
 
-    def test_candidate_numbers_include_existing_tags_and_drafts(self):
-        self.assertEqual(release.next_tag("2026-10-09", []), "2026-10-09-beta1")
-        self.assertEqual(release.next_tag("2026-10-09", ["2026-10-09-beta1", "2026-10-09-beta3",
-                                                       "2026-10-08-beta9", "2026-10-09-stable"]),
-                         "2026-10-09-beta4")
+    def test_candidate_uses_one_unnumbered_beta_per_date(self):
+        self.assertEqual(release.daily_beta_tag("2026-10-10"), "2026-10-10-beta")
+        self.assertIsNotNone(release.CANDIDATE.fullmatch("2026-10-10-beta"))
+        self.assertIsNotNone(release.CANDIDATE.fullmatch("2026-10-10-beta2"))
+        self.assertIsNotNone(release.CANDIDATE.fullmatch("2026-10-09-rc3"))
 
-    def test_beta_numbering_ignores_legacy_rc_tags(self):
-        self.assertEqual(release.next_tag("2026-10-09", ["2026-10-09-rc9"]), "2026-10-09-beta1")
+    def test_previous_release_uses_latest_candidate_from_prior_date(self):
+        entries = [
+            {"tag_name": "2026-10-10-beta1", "draft": False},
+            {"tag_name": "2026-10-10-beta2", "draft": False},
+            {"tag_name": "2026-10-09-rc1", "draft": False},
+            {"tag_name": "2026-10-09-rc3", "draft": False},
+            {"tag_name": "2026-10-09-rc2", "draft": False},
+            {"tag_name": "2026-10-08-stable", "draft": False},
+            {"tag_name": "2026-10-09-rc4", "draft": True},
+        ]
+        self.assertEqual(release.previous_release_tag(entries, "2026-10-10"), "2026-10-09-rc3")
+
+    def test_candidate_changelog_uses_previous_android_release(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            (directory / release.ASSETS[0]).write_bytes(b"synthetic signed APK")
+            (directory / release.ASSETS[3]).write_bytes(b"synthetic signed TV APK")
+            prior = {"tag_name": "2026-10-09-rc3", "draft": False}
+            with patch.object(release, "releases", return_value=[prior]), \
+                    patch.object(release, "api", return_value={"sha": "b" * 40}), \
+                    patch.object(release, "changelog_since", return_value="## Features\n\n- Enter a server address immediately.") as notes, \
+                    patch.object(release, "publish") as published:
+                release.candidate("owner/repo", "2026-10-10-beta", "a" * 40, 200000000, directory)
+                notes.assert_called_once_with("a" * 40, "b" * 40)
+                self.assertIn("Changelog baseline: `2026-10-09-rc3`", published.call_args.args[4])
+
+    def test_new_plan_selects_unnumbered_beta(self):
+        class FixedDateTime:
+            @classmethod
+            def now(cls, tz):
+                return datetime(2026, 10, 10, tzinfo=tz)
+        with patch.object(release, "datetime", FixedDateTime), \
+                patch.object(release, "releases", return_value=[]), \
+                patch.object(release, "run", return_value=""), \
+                patch("builtins.print") as output:
+            release.plan("owner/repo", "a" * 40)
+            output.assert_any_call("tag=2026-10-10-beta")
+
+    def test_plan_refuses_to_overwrite_existing_daily_beta(self):
+        class FixedDateTime:
+            @classmethod
+            def now(cls, tz):
+                return datetime(2026, 10, 10, tzinfo=tz)
+        entry = {"tag_name": "2026-10-10-beta", "draft": False,
+                 "body": f"Source commit: `{'b' * 40}`"}
+        with patch.object(release, "datetime", FixedDateTime), \
+                patch.object(release, "releases", return_value=[entry]):
+            with self.assertRaisesRegex(ValueError, "delete the release and tag"):
+                release.plan("owner/repo", "a" * 40)
 
     def test_legacy_rc_assets_remain_verifiable(self):
         with tempfile.TemporaryDirectory() as temp:
