@@ -1,4 +1,5 @@
 """Regression tests for publication boundaries and documentation failures."""
+import tempfile
 import datetime
 import importlib.util
 import pathlib
@@ -247,6 +248,33 @@ class WorkBranchPolicy(unittest.TestCase):
 
 class DocumentationPolicy(unittest.TestCase):
     """Check rejection as well as acceptance; deletions and odd paths matter."""
+
+    def test_clean_checkout_checks_latest_commit_and_respects_explicit_base(self):
+        script = pathlib.Path(__file__).with_name('check-documentation.py').resolve()
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            def git(*args):
+                return subprocess.run(['git', *args], cwd=root, check=True,
+                                      capture_output=True, text=True)
+            git('init')
+            git('config', 'user.name', 'Synthetic test')
+            git('config', 'user.email', 'test@example.invalid')
+            (root / 'README.md').write_text('Synthetic documentation.\n')
+            git('add', '.')
+            git('commit', '-m', 'Initial documentation')
+            (root / 'entry.ts').write_text('export const value = 1;\n')
+            git('add', '.')
+            git('commit', '-m', 'Undocumented source')
+            environment = dict(os.environ)
+            environment.pop('CI_BASE', None)
+            result = subprocess.run(['python3', str(script)], cwd=root, env=environment,
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('entry.ts: add an explanatory', result.stderr)
+            environment['CI_BASE'] = 'HEAD'
+            result = subprocess.run(['python3', str(script)], cwd=root, env=environment,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_requires_markdown_and_comment(self):
         self.assertEqual(len(docs([('M', 'web/a.ts')], lambda _: 'export const x = 1;')), 2)

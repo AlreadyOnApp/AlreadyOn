@@ -1,3 +1,4 @@
+// Pairing secrets stay masked until the user explicitly reveals the entered PIN.
 import { PasswordInput } from '../../components/PasswordInput';
 import { useTvPairing } from './useTvPairing';
 
