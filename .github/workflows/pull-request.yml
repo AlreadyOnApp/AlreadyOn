@@ -44,9 +44,12 @@ jobs:
           cache-from: type=gha,scope=source-validation-runtime
           cache-to: type=gha,mode=max,scope=source-validation-runtime
       - name: Build local CI tooling image on the patched runtime
-        run: docker build --file deploy/ci-base.Dockerfile --target ci-base \
-          --build-arg RUNTIME_BASE=alreadyon-validation:runtime \
-          --tag alreadyon-validation:ci .
+        run: |
+          docker build \
+            --file deploy/ci-base.Dockerfile \
+            --target ci-base \
+            --build-arg RUNTIME_BASE=alreadyon-validation:runtime \
+            --tag alreadyon-validation:ci .
       - name: Go regression and full browser e2e tests
         uses: ./.github/actions/test-source
         with:
