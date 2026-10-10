@@ -2,22 +2,26 @@
 
 [![AlreadyOn](../web/public/branding/header-doc.svg)](../README.md)
 
-**Publish Android Release** publishes a signed mobile and TV APKs when a push to `main` changes Android source, Gradle inputs, the wrapper or the release workflow/helper. Ordinary web/server changes do not trigger Android publication. Branch promotion to `main` remains maintainer-controlled. The workflow does not deploy a server or publish container images.
+## Approved release policy
 
-## Candidates and stable promotion
+Ordinary `dev` and `test` builds validate source without creating a GitHub release or Git tag. Releases follow an explicitly selected full commit SHA. Select the latest approved `dev` commit for promotion; cherry-pick the selected change set into the destination branch rather than including unrelated work. Record both the selected source SHA and destination SHA because cherry-picking changes commit identity.
 
-Candidates use `YYYY-MM-DD-betaN` in America/New_York, starting at `beta1` and incrementing past occupied tags and drafts. Legacy RC releases remain available and can still be verified or promoted. Candidates are GitHub prereleases and do not replace the latest stable release. A completed rerun for the same source commit verifies its existing assets and does not create another candidate. A failed upload leaves a recoverable draft.
+| Promotion | Release tag | Publication |
+| --- | --- | --- |
+| Selected `dev` commit into `test` | `YYYY-MM-DD-rcN` | Signed release candidate; GitHub prerelease |
+| Tested release from `test` into `main` | `YYYY-MM-DD-beta` | Beta; GitHub prerelease |
+| Tested beta approved as stable | `YYYY-MM-DD-stable` | Stable; marked latest |
 
-Each release attaches `alreadyon-android.apk`, `alreadyon-tv.apk`, `SHA256SUMS` and `android-release.json`, recording the source SHA, Android version and APK checksums. Uploads are verified before the draft becomes public. The APK uses the candidate tag as `versionName` and seconds since 2020 as an increasing `versionCode`; developer builds retain their existing version defaults.
+The RC date is the promotion date in America/New_York. RC numbering starts at `rc1` and advances past occupied tags and drafts for that date. Only RC releases increment. Beta and stable retain the selected RC’s date, even when promotion happens later. For example, `2026-10-10-rc2` becomes `2026-10-10-beta`, then `2026-10-10-stable`.
 
-After device testing, run **Publish Android Release** on `main`, choose `stable`, and enter the exact tested candidate tag. This explicit dispatch approves promotion. The workflow verifies its source is on main and checks downloaded asset hashes, then creates `YYYY-MM-DD-stable` at the candidate's commit with identical assets. It never rebuilds or re-signs. The embedded APK version remains `YYYY-MM-DD-betaN`, so devices already running that candidate need no update. The stable release is marked latest. Existing published assets cannot be overwritten; only one distinct stable APK may use a given date.
+Promotion retains the tested APK bytes, signatures, checksums, source provenance and changelog. Do not rebuild or re-sign. Cherry-picked source must correspond to the tested release; validate that mapping before publication. A different candidate cannot overwrite an existing date’s beta or stable release. Reruns verify existing assets; failed uploads remain recoverable drafts.
 
-Dispatch `candidate` on main to retry publication. Other branches cannot publish. Release writers are serialized; promote completed changes deliberately.
+Each release attaches `alreadyon-android.apk`, `alreadyon-tv.apk`, `SHA256SUMS` and `android-release.json`. The RC’s Android `versionName` and increasing `versionCode` remain embedded during promotion; renaming a GitHub release does not change installed APK versions. Changing a release title alone does not rename its Git tag.
 
-Release descriptions use reviewed [user-facing changelog entries](RELEASE_NOTES.md), grouped into Features, Improvements and Bug fixes. Candidates include changes since the last reachable stable release; stable promotion preserves the tested candidate’s notes. Build details are collapsed below download links.
+## Automation transition
 
-## Signing and platform scope
+The policy above supersedes the previous numbered-beta policy. The checked-in workflow currently publishes `YYYY-MM-DD-betaN` on qualifying pushes to `main` and supports direct stable promotion. It still needs implementation changes for selected-SHA RC publication on promotion to `test`, unnumbered beta promotion to `main`, and beta-to-stable promotion. Documentation changes alone do not alter those triggers.
 
-Configure the four repository secrets in [Android signing](ANDROID_SIGNING.md) before publishing. Missing secrets fail clearly. The release app uses `io.github.lynchbros.alreadyon`; the developer `.debug` app stays separate.
+## Signing and scope
 
-The mobile `:app` and [Google TV `:tv`](GOOGLE_TV.md) targets share playback/networking code and signing, with both APKs attached to one release. Tablet and physical-TV validation remain required. Both release APKs retain the established package name; debug targets use separate installation identities.
+Use the permanent credentials described in [Android signing](ANDROID_SIGNING.md). The mobile and [TV](GOOGLE_TV.md) APKs share signing and release provenance. Debug apps use separate installation identities. Physical phone/tablet and TV validation remains required. [Release notes](RELEASE_NOTES.md) describe user-visible changes. Server deployment and Docker publication follow [delivery](CI_CD.md).
