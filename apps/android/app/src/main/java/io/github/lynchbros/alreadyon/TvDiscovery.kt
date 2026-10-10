@@ -26,7 +26,13 @@ internal class TvDiscovery(context: Context, private val found: (TvServer) -> Un
     init {
         scope.launch {
             val manager = context.getSystemService(ConnectivityManager::class.java)
-            val network = manager.activeNetwork
+            // Wi-Fi without internet may not be Android's default network. Never scan cellular or VPN routes.
+            val network = (listOfNotNull(manager.activeNetwork) + manager.allNetworks).distinct().firstOrNull {
+                val caps = manager.getNetworkCapabilities(it)
+                caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) == true &&
+                    (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) &&
+                    manager.getLinkProperties(it)?.linkAddresses?.any { link -> link.address.address.size == 4 && link.address.isSiteLocalAddress } == true
+            }
             val capabilities = network?.let { manager.getNetworkCapabilities(it) }
             val links = network?.let { manager.getLinkProperties(it) }
             val local = links?.linkAddresses?.firstOrNull { it.address.address.size == 4 && it.address.isSiteLocalAddress }
