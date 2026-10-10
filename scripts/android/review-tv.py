@@ -49,7 +49,8 @@ def main():
     if 'CHANNEL' not in texts(tree) or not all(n.get('package', package) == package for n in tree.iter('node')):
         parser.error('Start the selected TV review app in its signed-in guide before running. No login data is modified.')
     initial = focused(tree)
-    assert initial, 'Guide must initially focus a channel'
+    if not initial.startswith('Channel '):
+        parser.error('Focus a channel row in the guide before running the remote review.')
     key(20)
     down = focused(snapshot())
     assert down and down != initial, 'Down must move to another channel'
@@ -83,6 +84,9 @@ def main():
     key(23) # Quality is the first root menu option.
     tree = snapshot()
     assert focused(tree).startswith('✓ '), 'Quality must focus its current setting'
+    options = [n.get('text', '').removeprefix('✓ ') for n in tree.iter('node')
+               if n.get('text', '').removeprefix('✓ ') in ('Auto', '1080p', '720p', '480p', '360p')]
+    assert options == sorted(options, key=('Auto', '1080p', '720p', '480p', '360p').index), 'Quality must descend after Auto'
     key(4)
     key(20)
     key(23)
