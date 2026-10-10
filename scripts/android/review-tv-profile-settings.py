@@ -74,18 +74,21 @@ def main():
         tree = snapshot()
         actual = focused(tree)
         assert (target in actual if target else actual in ('Set PIN', 'Clear PIN')), (category, actual)
-        key(21)
-        assert focused(snapshot()) == category, 'Left must return to its sidebar category'
+        key(4)
+        assert focused(snapshot()) == category, 'Back must return to its sidebar category'
         key(23)
         actual = focused(snapshot())
         assert (target in actual if target else actual in ('Set PIN', 'Clear PIN')), (category, actual)
-        key(21)
+        key(4)
+        assert focused(snapshot()) == category, 'Back after Select must restore the sidebar'
         print('PASS: automatic card and Right/Select entry', category, flush=True)
     key(22)
     before = focused(snapshot())
     key(23)
     after = focused(snapshot())
     assert before != after and 'by Default' in after, 'Subtitle default button must toggle the draft'
+    key(4)
+    assert focused(snapshot()) == 'Subtitles', 'First Back must restore the current sidebar category'
     key(4)
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
