@@ -15,7 +15,8 @@ class AndroidReleaseTests(unittest.TestCase):
     def fixture(self, directory):
         (directory / release.ASSETS[0]).write_bytes(b"synthetic signed APK")
         (directory / release.ASSETS[3]).write_bytes(b"synthetic signed TV APK")
-        with patch.object(release, "publish"):
+        with patch.object(release, "publish"), patch.object(release, "releases", return_value=[]), \
+                patch.object(release, "changelog", return_value="## Features\n\n- Synthetic feature."):
             release.candidate("owner/repo", "2026-10-09-rc2", "a" * 40, 200000000, directory)
 
     def test_download_includes_both_apks_and_provenance(self):
@@ -73,9 +74,10 @@ class AndroidReleaseTests(unittest.TestCase):
             self.assertEqual(tag, "2026-10-09-stable")
             self.assertEqual(sha, "a" * 40)
             self.assertFalse(prerelease)
+            self.assertIn("- Tested feature.", notes)
             self.assertEqual((directory / release.ASSETS[0]).read_bytes(), b"synthetic signed APK")
             self.assertEqual(release.verify_assets(directory)["version_name"], "2026-10-09-rc2")
-        with patch.object(release, "api", return_value={"draft": False, "prerelease": True}), \
+        with patch.object(release, "api", return_value={"draft": False, "prerelease": True, "body": "<!-- end-user-changelog:start -->\n## Features\n\n- Tested feature.\n<!-- end-user-changelog:end -->"}), \
                 patch.object(release, "run", return_value="a" * 40), \
                 patch.object(release.subprocess, "run") as git, \
                 patch.object(release, "download", side_effect=download), \
