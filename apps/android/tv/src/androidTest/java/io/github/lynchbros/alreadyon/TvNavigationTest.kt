@@ -71,10 +71,10 @@ class TvNavigationTest {
                 node.performClick()
             }
             if (manual) {
-                assertFalse("No manual address before search timeout", exists("HTTPS server address"))
-                compose.waitUntil(40000) { exists("HTTPS server address") }
-                assertTrue("Search lasts 30 seconds", SystemClock.elapsedRealtime() - startedAt >= 28500)
-                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).performTextInput("https://127.0.0.1:${bridge.localPort}")
+                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).assertExists()
+                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).performTextReplacement("https://127.0.0.1:${bridge.localPort}")
+                compose.onNodeWithText("Enter your server’s HTTPS address.").assertExists()
+                assertTrue("Manual entry starts before scan timeout", SystemClock.elapsedRealtime() - startedAt < 28500)
                 device.pressBack() // Dismiss the TV keyboard.
                 click("Check Server")
             } else {
@@ -95,12 +95,15 @@ class TvNavigationTest {
             compose.onNode(hasSetTextAction() and hasText("Username")).performTextInput("tv-fixture")
             compose.onNode(hasSetTextAction() and hasText("Username")).performImeAction()
             compose.waitUntil(10000) { exists("✓ Done") }
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("1") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             // Synthetic account PIN set by the isolated test fixture, never a live account.
             "123456".forEach { click(it.toString()) }
             click("✓ Done")
             compose.waitUntil(10000) { !exists("✓ Done") }
             click("Connect")
-            click("Admin")
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Admin") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            device.pressDPadCenter()
+            compose.waitUntil(10000) { exists("CHANNEL") }
             assertTrue("Compact guide on first entry", exists("CHANNEL"))
             assertTrue("Guide channel 110", exists("110"))
             val model = ViewModelProvider(compose.activity)[PhoneModel::class.java]
