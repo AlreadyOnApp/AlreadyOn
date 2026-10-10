@@ -36,7 +36,7 @@ import java.io.ByteArrayInputStream
 import java.security.cert.CertificateFactory
 import java.util.concurrent.TimeUnit
 
-private data class TvTrust(val certificate: String)
+private data class TvTrust(val certificate: String, val name: String)
 
 /** Only public bootstrap metadata uses an untrusted TLS connection; PINs never do. */
 private suspend fun probe(server: TvServer): TvTrust = withContext(Dispatchers.IO) {
@@ -54,14 +54,14 @@ private suspend fun probe(server: TvServer): TvTrust = withContext(Dispatchers.I
     val data = get("/api/tv/trust")
     val pem = data.getString("certificate")
     CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(pem.toByteArray()))
-    return@withContext TvTrust(pem)
+    return@withContext TvTrust(pem, info.getString("name"))
 
 }
 
 @Composable
 internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier: Modifier) {
     val context = LocalContext.current
-    val recent = remember { serverOrigin(state.origin)?.let { TvServer("Recently connected server", it) } }
+    val recent = remember { serverOrigin(state.origin)?.let { TvServer("${state.serverName} (Recently connected)", it) } }
     val servers = remember { mutableStateListOf<TvServer>().apply { recent?.let { add(it) } } }
     var scan by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<TvServer?>(null) }
@@ -95,7 +95,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     fun select(server: TvServer) {
         selected = server; checking = true; error = null; trust = null; model.dismissError()
         scope.launch {
-            try { trust = probe(server) }
+            try { val result = probe(server); selected = server.copy(name = result.name); trust = result }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (e: Exception) { error = e.message ?: "Could not check server." }
             finally { checking = false }
@@ -165,7 +165,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     modifier = Modifier.fillMaxWidth(0.6f).focusRequester(pinFocus).onFocusChanged {
                         if (it.isFocused) { keyboard?.hide(); pinKeypad = true }
                     }, enabled = !state.busy)
-                Button(modifier = Modifier.focusRequester(connectFocus).tvFocusOutline(), onClick = { model.signInWithPIN(selected!!.origin, username, pin, trust!!.certificate); pin = "" },
+                Button(modifier = Modifier.focusRequester(connectFocus).tvFocusOutline(), onClick = { model.signInWithPIN(selected!!.origin, username, pin, trust!!.certificate, trust!!.name); pin = "" },
                     enabled = username.isNotBlank() && pin.length in 6..12 && !state.busy) { Text("Connect") }
             }
             Button(modifier = Modifier.tvFocusOutline(), onClick = { selected = null; trust = null; pin = ""; error = null; model.dismissError() }, enabled = !checking && !state.busy) { Text("Choose Another Server") }

@@ -175,6 +175,7 @@ function CredentialsDialog({ mode, notice, onDone }: { mode: 'setup' | 'login'; 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [serverName, setServerName] = useState('AlreadyOn');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
@@ -187,7 +188,7 @@ function CredentialsDialog({ mode, notice, onDone }: { mode: 'setup' | 'login'; 
       if (password !== confirm) return setError("The passwords don't match.");
     }
     setBusy(true);
-    const result = await post(setup ? '/api/auth/setup' : '/api/auth/login', { username, password });
+    const result = await post(setup ? '/api/auth/setup' : '/api/auth/login', { username, password, ...(setup ? { serverName: serverName.trim() } : {}) });
     setBusy(false);
     if (result.ok) onDone();
     else setError(result.message);
@@ -206,6 +207,10 @@ function CredentialsDialog({ mode, notice, onDone }: { mode: 'setup' | 'login'; 
         ) : (
           notice && <p className="auth-hint">{notice}</p>
         )}
+        {setup && <>
+          <label htmlFor="auth-server-name">Server Name</label>
+          <input id="auth-server-name" name="serverName" type="text" value={serverName} onChange={(e) => setServerName(e.target.value)} maxLength={64} required />
+        </>}
         <label htmlFor="auth-username">Username</label>
         <input id="auth-username" name="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} maxLength={64} required autoFocus />
         <label htmlFor="auth-password">Password</label>

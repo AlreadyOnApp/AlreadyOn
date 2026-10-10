@@ -253,7 +253,7 @@ export default function ServerPage() {
   const handleSave = async () => {
     await ddnsRef.current?.save();
     await tlsRef.current?.save();
-    if (draft) await updateServerSettings({ transcoding: draft.transcoding, hardwareDecoding: draft.hardwareDecoding,
+    if (draft) await updateServerSettings({ serverName: draft.serverName, transcoding: draft.transcoding, hardwareDecoding: draft.hardwareDecoding,
       tlsMode: draft.tlsMode, acmeProvider: draft.acmeProvider, acmeDomain: draft.acmeDomain });
   };
 
@@ -305,6 +305,7 @@ export default function ServerPage() {
       <RestartCard />
       <div className="admin-card">
         <div className="settings-grid">
+          <Row name="Server Name" control={<input aria-label="Server Name" type="text" value={draft.serverName} maxLength={64} required onChange={(e) => setDraft({ ...draft, serverName: e.target.value })} />} note={<p className="setting-note admin-section-hint">Shown when phones, tablets and TVs find this server.</p>} />
           <Row
             name="Hardware Encoding"
             control={

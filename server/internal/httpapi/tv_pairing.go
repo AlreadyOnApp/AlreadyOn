@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/lynchbros/alreadyon/server/internal/auth"
+	"github.com/lynchbros/alreadyon/server/internal/serversettings"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 )
@@ -26,8 +26,12 @@ func handleTVServer(db *sql.DB) http.HandlerFunc {
 		if !tvLAN(w, r) {
 			return
 		}
-		name, _ := os.Hostname()
-		writeJSON(w, http.StatusOK, map[string]any{"name": "AlreadyOn " + name, "pairingEnabled": auth.TVPairingEnabled(r.Context(), db), "protocol": 1})
+		settings, err := serversettings.Get(r.Context(), db)
+		if err != nil {
+			writeJSONError(w, 500, "could not read server name")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"name": settings.ServerName, "service": "alreadyon", "pairingEnabled": auth.TVPairingEnabled(r.Context(), db), "protocol": 1})
 	}
 }
 

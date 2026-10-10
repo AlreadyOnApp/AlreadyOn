@@ -77,7 +77,7 @@ def main():
                         {"Content-Type": "application/json"}, method=method)
                     with opener.open(request) as response:
                         return response.read()
-                api("/api/auth/setup", {"username": "tv-fixture", "password": "synthetic-tv-fixture-pass"})
+                api("/api/auth/setup", {"username": "tv-fixture", "password": "synthetic-tv-fixture-pass", "serverName": "AlreadyOn TV fixture"})
                 api("/api/auth/tv-pin", {"pin": "123456"}, "PUT")
                 video = media / "program.mp4"
                 run("ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",

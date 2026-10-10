@@ -79,7 +79,7 @@ internal suspend fun probeDiscovery(client: OkHttpClient, origin: String): TvSer
                     if (source.request(16 * 1024L + 1)) return@use null
                     val metadata = JSONObject(source.readUtf8())
                     val name = metadata.optString("name")
-                    if (metadata.optInt("protocol") != 1 || !metadata.has("pairingEnabled") || !name.startsWith("AlreadyOn ")) null
+                    if (metadata.optInt("protocol") != 1 || !metadata.has("pairingEnabled") || (name.isBlank() || (metadata.optString("service") != "alreadyon" && !name.startsWith("AlreadyOn ")))) null
                     else TvServer(name.take(128), origin)
                 }
             }.getOrNull()

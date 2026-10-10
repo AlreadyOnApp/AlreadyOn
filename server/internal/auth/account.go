@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/lynchbros/alreadyon/server/internal/serversettings"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -67,7 +68,16 @@ func ValidateCredentials(username, password string) (string, error) {
 // concurrent first-run requests are safe: one succeeds and the rest get
 // ErrAccountExists. Later accounts are added by an owner with CreateUser.
 func CreateAccount(ctx context.Context, db *sql.DB, username, password string) (User, error) {
-	username, err := ValidateCredentials(username, password)
+	return CreateNamedAccount(ctx, db, username, password, "AlreadyOn")
+}
+
+// CreateNamedAccount stores the instance identity and first owner in one transaction.
+func CreateNamedAccount(ctx context.Context, db *sql.DB, username, password, serverName string) (User, error) {
+	serverName, err := serversettings.ValidateServerName(serverName)
+	if err != nil {
+		return User{}, err
+	}
+	username, err = ValidateCredentials(username, password)
 	if err != nil {
 		return User{}, err
 	}
@@ -91,6 +101,9 @@ func CreateAccount(ctx context.Context, db *sql.DB, username, password string) (
 		return User{}, fmt.Errorf("auth: create account: %w", err)
 	}
 	if err := seedDefaultProfiles(ctx, tx, id); err != nil {
+		return User{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE server_settings SET server_name = ?, updated_at_unix = unixepoch() WHERE id = 1`, serverName); err != nil {
 		return User{}, err
 	}
 	if err := tx.Commit(); err != nil {

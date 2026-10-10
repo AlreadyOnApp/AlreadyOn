@@ -3,6 +3,7 @@ package httpapi
 import (
 	"database/sql"
 	"errors"
+	"github.com/lynchbros/alreadyon/server/internal/serversettings"
 	"net/http"
 	"strconv"
 	"strings"
@@ -93,7 +94,10 @@ func credentialMessage(err error) string {
 // on first run and signs the browser in. It is refused once an account exists.
 func handleAuthSetup(db *sql.DB, cookieName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var body credentialsBody
+		var body struct {
+			credentialsBody
+			ServerName *string `json:"serverName"`
+		}
 		if !decodeStrict(w, r, &body) {
 			return
 		}
@@ -107,8 +111,15 @@ func handleAuthSetup(db *sql.DB, cookieName string) http.HandlerFunc {
 			writeJSONError(w, http.StatusConflict, "The server already has an account. Sign in instead.")
 			return
 		}
-		user, err := auth.CreateAccount(r.Context(), db, body.Username, body.Password)
+		serverName := "AlreadyOn" // Backward-compatible default for existing API setup clients.
+		if body.ServerName != nil {
+			serverName = *body.ServerName
+		}
+		user, err := auth.CreateNamedAccount(r.Context(), db, body.Username, body.Password, serverName)
 		switch {
+		case errors.Is(err, serversettings.ErrInvalidServerName):
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
 		case errors.Is(err, auth.ErrInvalidUsername), errors.Is(err, auth.ErrInvalidPassword):
 			writeJSONError(w, http.StatusBadRequest, credentialMessage(err))
 			return
