@@ -5,6 +5,8 @@
 
 ## Improvements
 
+- Download Android preview releases labeled beta instead of release candidate.
+
 - Browse a compact four-row TV guide with smoother scrolling, two-line programme cards and details that follow the selected programme.
 - See centered startup branding on Android phones and TVs while the app prepares content.
 - Open the profile menu from the mini-player with Switch Profile selected, and return to the mini-player with Back.

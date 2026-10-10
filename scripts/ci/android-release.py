@@ -13,7 +13,9 @@ import time
 from zoneinfo import ZoneInfo
 from release_notes import changelog, published_changelog, release_body
 
-RC = re.compile(r"(\d{4}-\d{2}-\d{2})-rc([1-9]\d*)\Z")
+# New releases use beta tags; retain verification and promotion of already published RC assets.
+CANDIDATE = re.compile(r"(\d{4}-\d{2}-\d{2})-(?:beta|rc)([1-9]\d*)\Z")
+BETA = re.compile(r"(\d{4}-\d{2}-\d{2})-beta([1-9]\d*)\Z")
 ASSETS = ("alreadyon-android.apk", "SHA256SUMS", "android-release.json", "alreadyon-tv.apk")
 
 
@@ -33,8 +35,8 @@ def releases(repo):
 
 def next_tag(day, tags):
     numbers = [int(match[2]) for tag in tags
-               if (match := RC.fullmatch(tag)) and match[1] == day]
-    return f"{day}-rc{max(numbers, default=0) + 1}"
+               if (match := BETA.fullmatch(tag)) and match[1] == day]
+    return f"{day}-beta{max(numbers, default=0) + 1}"
 
 
 def digest(path):
@@ -47,7 +49,7 @@ def verify_assets(directory, source=None):
         raise ValueError("Unexpected Android application identity")
     if source is not None and manifest.get("source_sha") != source:
         raise ValueError("Candidate source revision does not match its tag")
-    if not RC.fullmatch(manifest.get("version_name", "")):
+    if not CANDIDATE.fullmatch(manifest.get("version_name", "")):
         raise ValueError("Invalid candidate version")
     expected = digest(directory / ASSETS[0])
     if manifest.get("apk_sha256") != expected:
@@ -107,7 +109,7 @@ def publish(repo, tag, sha, directory, notes, prerelease):
 def plan(repo, sha):
     entries = releases(repo)
     marker = f"Source commit: `{sha}`"
-    existing = next((r for r in entries if RC.fullmatch(r["tag_name"])
+    existing = next((r for r in entries if BETA.fullmatch(r["tag_name"])
                      and marker in (r.get("body") or "")), None)
     if existing:
         target = (existing.get("target_commitish") if existing["draft"]
@@ -138,7 +140,7 @@ def plan(repo, sha):
 
 
 def candidate(repo, tag, sha, code, directory):
-    if not RC.fullmatch(tag) or not 0 < code <= 2100000000:
+    if not CANDIDATE.fullmatch(tag) or not 0 < code <= 2100000000:
         raise ValueError("Invalid Android release version")
     manifest = {"source_sha": sha, "version_name": tag, "version_code": code,
                 "package": "io.github.lynchbros.alreadyon",
@@ -155,9 +157,9 @@ def candidate(repo, tag, sha, code, directory):
 
 
 def promote(repo, tag):
-    match = RC.fullmatch(tag)
+    match = CANDIDATE.fullmatch(tag)
     if match is None:
-        raise ValueError("Stable promotion requires a YYYY-MM-DD-rcN candidate")
+        raise ValueError("Stable promotion requires a YYYY-MM-DD-betaN (or legacy rcN) candidate")
     release = api(f"repos/{repo}/releases/tags/{tag}")
     if release["draft"] or not release["prerelease"]:
         raise ValueError("Select a published Android release candidate")
