@@ -2,53 +2,46 @@ package auth
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"sync"
 	"testing"
 )
 
 // Chosen keys need salted password hashes; generated random keys retain their
-// indexed SHA-256 lookup. Upgrades preserve IDs so playback scopes stay valid.
-func TestTestingKeysUseSaltedHashesAndUpgradeLegacyRecords(t *testing.T) {
+// indexed SHA-256 lookup. Legacy test-key rows are revoked on reprovisioning.
+func TestLegacyTestingKeysRequireReprovisioning(t *testing.T) {
 	ctx := context.Background()
 	db := openAPIKeyTestDB(t)
 	const raw = "4826"
-	sum := sha256.Sum256([]byte(raw))
-	legacy := hex.EncodeToString(sum[:])
+	const legacy = "0a4e3e70597a358b9447fa8a647aadf5b76dde95c8e4ab02e5f8cee6caa1cd28"
 	var id int64
 	if err := db.QueryRow(`INSERT INTO api_keys (user_id,name,key_hash,key_prefix) VALUES (?,'legacy',?,'test-key') RETURNING id`, ownerID(t, db), legacy).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
-	stored := func() string {
-		t.Helper()
-		var hash string
-		if err := db.QueryRow(`SELECT key_hash FROM api_keys WHERE id=?`, id).Scan(&hash); err != nil {
-			t.Fatal(err)
-		}
-		return hash
+	if _, _, err := VerifyAPIKey(ctx, db, raw); err == nil {
+		t.Fatal("legacy test key remained valid")
 	}
-	if _, _, err := VerifyAPIKey(ctx, db, "4827"); err == nil {
-		t.Fatal("wrong legacy credential accepted")
+	var unchanged string
+	if err := db.QueryRow(`SELECT key_hash FROM api_keys WHERE id=?`, id).Scan(&unchanged); err != nil || unchanged != legacy {
+		t.Fatalf("authentication changed legacy hash: %q, %v", unchanged, err)
 	}
-	if stored() != legacy {
-		t.Fatal("wrong credential changed legacy hash")
+	key, err := ProvisionTestAPIKey(ctx, db, "reprovisioned", raw)
+	if err != nil || key.ID == id {
+		t.Fatalf("legacy key was not replaced: %+v, %v", key, err)
 	}
-	if got, _, err := VerifyAPIKey(ctx, db, raw); err != nil || got != id {
-		t.Fatalf("legacy key rejected: %d, %v", got, err)
+	var hash string
+	if err := db.QueryRow(`SELECT key_hash FROM api_keys WHERE id=?`, key.ID).Scan(&hash); err != nil {
+		t.Fatal(err)
 	}
-	first := stored()
-	if !strings.HasPrefix(first, "$argon2id$") || !VerifyPassword(first, raw) {
-		t.Fatal("legacy hash was not upgraded")
+	if !strings.HasPrefix(hash, "$argon2id$") || !VerifyPassword(hash, raw) {
+		t.Fatal("reprovisioned test key must use Argon2id")
 	}
-	key, err := ProvisionTestAPIKey(ctx, db, "renamed", raw)
-	if err != nil || key.ID != id {
-		t.Fatalf("reprovision changed identity: %+v, %v", key, err)
+	var count int
+	if err := db.QueryRow(`SELECT count(*) FROM api_keys WHERE key_prefix='test-key'`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("legacy row was not removed: records=%d, err=%v", count, err)
 	}
-	second := stored()
-	if first == second || !VerifyPassword(second, raw) {
-		t.Fatal("reprovision did not use a fresh salt")
+	if got, _, err := VerifyAPIKey(ctx, db, raw); err != nil || got != key.ID {
+		t.Fatalf("reprovisioned key rejected: %d, %v", got, err)
 	}
 	generated, generatedKey, err := GenerateAPIKey(ctx, db, ownerID(t, db), "generated")
 	if err != nil {
