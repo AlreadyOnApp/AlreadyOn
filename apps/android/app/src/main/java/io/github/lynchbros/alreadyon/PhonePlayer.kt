@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.input.key.*
 import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.*
 import androidx.compose.foundation.background
@@ -226,7 +227,11 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
             .background(Color.Black.copy(alpha = 0.6f)).padding(4.dp), color = Color.White, fontSize = if (pictureInPicture) 10.sp else 16.sp, lineHeight = if (pictureInPicture) 12.sp else 20.sp)
         if (controlsShown) {
             // Match the web touch layout: gradient and shared station/program metadata above the transport row.
-            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { controlsHeight = it.height }
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().onPreviewKeyEvent { event ->
+                // Remote navigation extends the overlay timeout while leaving focus to its controls.
+                if (tv && event.type == KeyEventType.KeyDown) interaction++
+                false
+            }.onSizeChanged { controlsHeight = it.height }
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
                 .padding(if (fullscreen) WindowInsets.safeDrawing.asPaddingValues() else PaddingValues(0.dp))
                 .padding(horizontal = if (fullscreen) 16.dp else 4.dp, vertical = 4.dp),

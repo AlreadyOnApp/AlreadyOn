@@ -402,6 +402,8 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         if (resume) state.value.channel?.let(::watch)
     }
     // Physical phone buttons control output volume; the player controls only mute.
+    // Deliberate fullscreen entry starts audible playback without toggling an already audible stream.
+    fun unmute() = update { it.copy(muted = false) }
     fun toggleMute() = update { it.copy(muted = !it.muted) }
 
     fun playerFailed(revision: Long) {
