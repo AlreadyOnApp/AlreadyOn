@@ -1,8 +1,6 @@
 package io.github.lynchbros.alreadyon
 
 import android.os.SystemClock
-import android.net.nsd.NsdManager
-import android.net.nsd.NsdServiceInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -15,8 +13,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.net.ServerSocket
 import java.net.Socket
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /** Real TV discovery/login against a marked, disposable host server and synthetic media.
@@ -46,22 +42,9 @@ class TvNavigationTest {
                 }
             }
         }
-        val nsd = instrumentation.targetContext.getSystemService(NsdManager::class.java)
-        val registered = CountDownLatch(1)
-        val listener = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(info: NsdServiceInfo) { registered.countDown() }
-            override fun onRegistrationFailed(info: NsdServiceInfo, code: Int) = Unit
-            override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
-            override fun onUnregistrationFailed(info: NsdServiceInfo, code: Int) = Unit
-        }
         val manual = InstrumentationRegistry.getArguments().getString("entryMode") == "manual"
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            if (!manual) nsd.registerService(NsdServiceInfo().apply {
-                serviceName = "AlreadyOn TV fixture"; serviceType = "_alreadyon._tcp."
-                setPort(bridge.localPort)
-            }, NsdManager.PROTOCOL_DNS_SD, listener)
-            if (!manual) assertTrue("Fixture discovery registration", registered.await(10, TimeUnit.SECONDS))
             compose.onAllNodes(hasClickAction() and (hasContentDescription("AlreadyOn") or hasAnyDescendant(hasContentDescription("AlreadyOn")))).assertCountEquals(0)
             fun exists(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
             fun click(text: String) {
@@ -72,15 +55,17 @@ class TvNavigationTest {
                 node.performClick()
             }
             if (manual) {
-                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).assertExists()
-                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).performTextReplacement("https://127.0.0.1:${bridge.localPort}")
+                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).assertDoesNotExist()
+                compose.waitUntil(35000) { exists("HTTPS server address") }
+                assertTrue("Manual entry follows the scan deadline", SystemClock.elapsedRealtime() - startedAt >= 29000)
+                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).assertTextContains("https://")
+                compose.onNode(hasSetTextAction() and hasText("HTTPS server address")).performTextReplacement("127.0.0.1:${bridge.localPort}")
                 compose.onNodeWithText("Enter your server’s HTTPS address.").assertExists()
-                assertTrue("Manual entry starts before scan timeout", SystemClock.elapsedRealtime() - startedAt < 28500)
                 device.pressBack() // Dismiss the TV keyboard.
                 click("Check Server")
             } else {
-                compose.waitUntil(60000) { compose.onAllNodes(hasText("AlreadyOn TV fixture ·", substring = true)).fetchSemanticsNodes().isNotEmpty() }
-                val server = hasText("AlreadyOn TV fixture ·", substring = true)
+                compose.waitUntil(60000) { compose.onAllNodes(hasText("10.0.2.2:19900", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+                val server = hasText("10.0.2.2:19900", substring = true)
                 // Real remote events catch parent focus targets that swallow navigation.
                 repeat(8) {
                     if (compose.onAllNodes(server and isFocused()).fetchSemanticsNodes().isEmpty()) {
@@ -141,7 +126,6 @@ class TvNavigationTest {
             device.takeScreenshot(java.io.File(instrumentation.targetContext.getExternalFilesDir(null), "tv-last-state.png"))
             running = false; bridge.close()
             peers.toList().forEach { runCatching { it.close() } }
-            runCatching { nsd.unregisterService(listener) }
         }
     }
 }

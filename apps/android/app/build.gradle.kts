@@ -14,8 +14,8 @@ android {
         minSdk = 26
         targetSdk = 36
         buildConfigField("boolean", "IS_TV", "false")
-        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 22
-        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.21-dev"
+        versionCode = providers.gradleProperty("androidVersionCode").orNull?.toInt() ?: 23
+        versionName = providers.gradleProperty("androidVersionName").orNull ?: "0.1.22-dev"
     }
     buildTypes {
         debug { applicationIdSuffix = providers.gradleProperty("androidDebugSuffix").orNull ?: ".debug" }
@@ -31,6 +31,7 @@ android {
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation(platform("androidx.compose:compose-bom:2025.12.00"))
     implementation("androidx.activity:activity-compose:1.12.4")
     implementation("androidx.compose.material3:material3")

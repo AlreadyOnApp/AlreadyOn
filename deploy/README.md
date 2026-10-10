@@ -12,11 +12,9 @@ Persist writable application configuration and database storage. Mount library m
 
 The runtime uses HTTPS port 19900 for UI, API and media. Port 19902 is reserved for HTTP-01 challenges when needed. See [TLS](../docs/TLS.md) for local trust and public certificates. Create the owner through first-run setup.
 
-Home-LAN discovery requires `network_mode: host` on Linux Docker Engine. Remove service `ports` and `networks` entries; host mode uses the host's interfaces and listener ports directly. Allow UDP 5353 multicast on the trusted LAN and TCP 19900 from clients. Port 19901 is unused. Guest-network isolation can still prevent discovery. Docker Desktop host networking does not guarantee LAN multicast discovery; manual server entry remains available.
+Native clients discover servers by scanning the current IPv4 LAN's published HTTPS port 19900 for up to 30 seconds. Standard Docker bridge networking is supported; host mode, multicast and an extra discovery port are unnecessary. Publish 19900 on a LAN-reachable host address. Guest isolation and firewalls can prevent discovery. Port 19901 is unused.
 
-Traefik can stay on its bridge network and proxy to `https://host.docker.internal:19900`. Add `extra_hosts: ["host.docker.internal:host-gateway"]` to Traefik on Linux, explicitly select backend port 19900 and scheme HTTPS, and configure its certificate trust/server name for AlreadyOn. Remove any AlreadyOn `traefik.docker.network` label. See [Traefik host networking](https://doc.traefik.io/traefik/v3.6/reference/install-configuration/providers/docker/#host-networking).
-
-Traefik may manage Let's Encrypt on public ports 80/443. If AlreadyOn manages its own HTTP-01 certificate instead, forward public port 80's `/.well-known/acme-challenge/` path to the host's HTTP listener on 19902, or forward router TCP 80 directly to 19902 when Traefik does not own port 80. Keep application traffic on HTTPS 19900; discovery remains LAN-only.
+Traefik can keep its existing Docker network, HTTPS backend or TLS passthrough to 19900, and HTTP-01 route to 19902. Traefik may manage Let's Encrypt on public ports 80/443; if AlreadyOn manages certificates, forward the challenge path to its HTTP listener on 19902 instead. Native LAN pairing connects directly to 19900.
 
 The example documents supported identity/timezone/port settings. Keep tokens, custom domains and private host configuration in local files excluded from Git. Do not add undocumented environment variables.
 
