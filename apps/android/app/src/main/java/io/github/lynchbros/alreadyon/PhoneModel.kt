@@ -57,6 +57,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
     suspend fun profileIcon(path: String) = client?.profileIcon(path)
 
     fun dismissError() = update { it.copy(error = null) }
+    fun dismissNotice() = update { it.copy(notice = null) }
 
     private fun perform(block: suspend () -> Unit) {
         if (action?.isActive == true) return
