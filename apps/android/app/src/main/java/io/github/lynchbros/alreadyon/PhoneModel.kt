@@ -16,10 +16,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.time.Instant
+import java.util.UUID
 
 /** Authorized media metadata is ephemeral and never saved in Android instance state. */
 internal data class PhonePlayback(val url: String, val title: String, val startMs: Long, val revision: Long, val hlsTargetMs: Long? = null, val capturedAt: Long = SystemClock.elapsedRealtime(), val requestedAt: Long = capturedAt,
@@ -325,11 +327,13 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         val profile = state.value.profile ?: return
         if (state.value.mustChangePassword || state.value.settings != null) return
         val requestedAt = SystemClock.elapsedRealtime()
+        val viewerId = UUID.randomUUID().toString()
         val previous = viewing
         previous?.cancel()
         update { it.copy(channel = channel, playback = null, error = null) }
         viewing = viewModelScope.launch {
             previous?.join()
+            var activityStarted = false
             try {
                 while (true) {
                     var token: String? = null
@@ -380,10 +384,20 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
                         update { it.copy(playback = media, profile = it.profile?.copy(lastChannel = channel.id),
                             subtitleIndex = selectedSubtitle(media, profile),
                             subtitleFileId = media.mediaFileId) }
+                        activityStarted = true
+                        reportActivity(api, viewerId, channel.id, token, profile.id, state.value.paused)
                         val boundary = SystemClock.elapsedRealtime() + remainingMs
+                        var lastStatusAt = SystemClock.elapsedRealtime()
                         while (SystemClock.elapsedRealtime() < boundary) {
-                            delay(minOf(10_000, (boundary - SystemClock.elapsedRealtime()).coerceAtLeast(1)))
-                            if (SystemClock.elapsedRealtime() < boundary) status(api, channel.id, token)
+                            delay(minOf(5_000, (boundary - SystemClock.elapsedRealtime()).coerceAtLeast(1)))
+                            val elapsed = SystemClock.elapsedRealtime()
+                            if (elapsed < boundary) {
+                                reportActivity(api, viewerId, channel.id, token, profile.id, state.value.paused)
+                                if (elapsed - lastStatusAt >= 10_000) {
+                                    status(api, channel.id, token)
+                                    lastStatusAt = elapsed
+                                }
+                            }
                         }
                         update { it.copy(playback = null) }
                     } finally {
@@ -398,6 +412,8 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
             catch (e: Exception) {
                 handleFailure(e)
                 update { it.copy(playback = null, error = safeError(e)) }
+            } finally {
+                if (activityStarted) withContext(NonCancellable) { endActivity(api, viewerId) }
             }
         }
     }
@@ -436,6 +452,31 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
 
     private suspend fun status(api: ServerClient, channel: Long, token: String): JSONObject =
         JSONObject(api.request("/api/playback/status", "POST", JSONObject().put("channelId", channel).put("token", token)))
+
+    private suspend fun reportActivity(api: ServerClient, viewerId: String, channel: Long, token: String,
+        profileId: Long, paused: Boolean) {
+        withTimeoutOrNull(4000) {
+            try {
+                api.request("/api/playback/activity", "POST", JSONObject()
+                    .put("viewerId", viewerId).put("channelId", channel).put("token", token)
+                    .put("profileId", profileId).put("paused", paused))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private suspend fun endActivity(api: ServerClient, viewerId: String) {
+        withTimeoutOrNull(5000) {
+            try {
+                api.request("/api/playback/activity", "DELETE", JSONObject().put("viewerId", viewerId))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     /** Query Android decoder support conservatively; do not advertise HDR, HEVC or direct containers yet. */
     private fun decoderCapabilities(): JSONObject {
