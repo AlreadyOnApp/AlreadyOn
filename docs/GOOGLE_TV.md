@@ -6,7 +6,9 @@ The `:tv` target shares networking, profiles, guide, branding, quality, mute, au
 
 The centered chooser says **Select Profile**. Guide Up/Down changes rows; Left/Right selects programs. One focus target per row and drawn program cells keep navigation light. Channel selection opens fullscreen and unmutes.
 
-Fullscreen Left/Right tunes channels with controls hidden, or navigates visible controls. Up/Down reveals controls, then navigates them; Select activates the focused control. Select also reveals controls; Back closes menus, then controls, then fullscreen. Playback settings survive tuning. TV uses SurfaceView, a 16 MiB buffer target and 500 ms initial media buffering; server preparation and network transfer also affect startup.
+Fullscreen Left/Right tunes with controls hidden and navigates controls when visible. Each overlay activation starts on Play/Pause. Submenus focus the current option. See [remote navigation](TV_REMOTE_NAVIGATION.md) for guide Back, mini-player and profile behavior.
+
+TV uses SurfaceView, a 16 MiB buffer target and 500 ms initial media buffering; server preparation and network transfer also affect startup.
 
 ## Connect
 

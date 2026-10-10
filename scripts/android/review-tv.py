@@ -59,6 +59,11 @@ def main():
     tree = snapshot()
     assert 'CHANNEL' not in texts(tree), 'Select must enter fullscreen'
     key(19)
+    key(23) # Pause keeps screenshots stable while checking focus; no settings are changed.
+    assert focused(snapshot()) == 'Play', 'Pause must retain transport focus'
+    key(20)
+    key(19)
+    assert focused(snapshot()) == 'Play', 'Overlay Up/Down must retain transport focus'
     key(22)
     assert focused(snapshot()) in ('Mute', 'Unmute'), 'Right must reach the mute control'
     key(22)
@@ -67,6 +72,21 @@ def main():
     tree = snapshot()
     assert {'Quality', 'Audio Tracks', 'Subtitles'} <= texts(tree), 'Settings menu must open'
     print('PASS: fullscreen overlay navigation and Settings', flush=True)
+    key(23) # Quality is the first root menu option.
+    tree = snapshot()
+    assert focused(tree).startswith('✓ '), 'Quality must focus its current setting'
+    key(4)
+    key(20)
+    key(23)
+    tree = snapshot()
+    if 'No audio tracks' not in texts(tree):
+        assert focused(tree).startswith('✓ '), 'Audio must focus its active track'
+    key(4)
+    key(20)
+    key(20)
+    key(23)
+    assert focused(snapshot()).startswith('✓ '), 'Subtitles must focus its current setting'
+    key(4)
     key(4)
     tree = snapshot()
     assert 'CHANNEL' not in texts(tree), 'Menu Back must retain fullscreen'
@@ -77,6 +97,21 @@ def main():
         if 'CHANNEL' in texts(tree):
             break
     assert 'CHANNEL' in texts(tree), 'Back must return to guide'
+    key(20)
+    key(4)
+    assert focused(snapshot()) == initial, 'Guide Back must restore the previewed channel'
+    key(4)
+    assert focused(snapshot()) == 'Play', 'Second guide Back must focus mini-player transport'
+    key(23) # Resume in the mini-player; focus must remain on transport.
+    assert focused(snapshot()) == 'Pause', 'Resume must retain transport focus'
+    key(20)
+    assert focused(snapshot()) == initial, 'Mini-player Down must restore guide focus'
+    key(4)
+    key(19)
+    profile = focused(snapshot())
+    assert profile and profile not in ('Pause', 'Mute', 'Settings', initial), 'Mini-player Up must focus profile'
+    key(4)
+    assert not any(n.get('package') == package for n in snapshot().iter('node')), 'Back from profile must exit the application'
     # Force-stop tests process death, preserving Keystore cookies and profile preferences.
     run('shell', 'am', 'force-stop', package)
     run('shell', 'am', 'start', '-n', f'{package}/io.github.lynchbros.alreadyon.MainActivity')
@@ -84,7 +119,7 @@ def main():
     while time.monotonic() < deadline:
         restored = texts(snapshot())
         if 'CHANNEL' in restored or 'Select Profile' in restored:
-            print('PASS: four arrows, Select, overlay controls, Settings, Back and sign-in after process death')
+            print('PASS: guide arrows, overlay focus, current submenu settings, pause/resume, guide Back, mini-player/profile navigation, exit and session restoration')
             return
     raise AssertionError('Saved session did not restore the guide after process death')
 

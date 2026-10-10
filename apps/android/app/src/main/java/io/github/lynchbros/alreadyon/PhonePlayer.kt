@@ -38,6 +38,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
@@ -169,18 +170,22 @@ private fun NativeVideo(playback: PhonePlayback, model: PhoneModel, modifier: Mo
 /** Overlay controls occupy the video surface; fullscreen never reserves guide or toolbar space. */
 @Composable
 internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifier, fullscreen: Boolean, pictureInPicture: Boolean = false,
-    tv: Boolean = false, controlsSignal: Int = 0, onControlsVisibility: (Boolean) -> Unit = {},
+    tv: Boolean = false, tvActive: Boolean = true, controlsSignal: Int = 0, onControlsVisibility: (Boolean) -> Unit = {},
     onFullscreen: () -> Unit, onExitFullscreen: () -> Unit = onFullscreen) {
     var visible by remember { mutableStateOf(!tv) }
     val transportFocus = remember { FocusRequester() }
-    LaunchedEffect(controlsSignal) {
-        if (tv && controlsSignal > 0) { visible = true }
-    }
+
     var controlsHeight by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     var interaction by remember { mutableIntStateOf(0) }
     var menu by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf<String?>(null) }
+    // Every overlay activation starts at transport; submenu navigation keeps its own focus.
+    LaunchedEffect(controlsSignal, fullscreen, state.playback?.revision, state.paused, tvActive) {
+        if (tv && tvActive) { visible = true; menu = false; page = null; interaction++ }
+    }
+    val controlModifier = if (tv) Modifier.focusProperties { canFocus = tvActive } else Modifier
+
     var sourceTime by remember { mutableDoubleStateOf(0.0) }
     var cues by remember { mutableStateOf<List<PhoneCue>>(emptyList()) }
     var captionStatus by remember { mutableStateOf<String?>(null) }
@@ -205,7 +210,7 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
     val duration = program?.let { Instant.parse(it.endsAt).toEpochMilli() - Instant.parse(it.startsAt).toEpochMilli() } ?: 0L
     val elapsed = program?.let { (now - Instant.parse(it.startsAt).toEpochMilli()).coerceIn(0, duration) } ?: 0L
     LaunchedEffect(visible, interaction, menu, state.paused, state.playback?.revision) {
-        if (visible && !menu && !state.paused && state.playback != null) { delay(5000); visible = false }
+        if (visible && (!tv || fullscreen) && !menu && !state.paused && state.playback != null) { delay(5000); visible = false }
     }
     BackHandler(enabled = tv && fullscreen && (menu || visible)) {
         if (page != null) page = null else if (menu) menu = false
@@ -241,10 +246,10 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
             color = Color.White, style = MaterialTheme.typography.bodySmall) }
         val caption = cues.filter { sourceTime >= it.start && sourceTime < it.end }.joinToString("\n") { it.text }
         // Keep captions near the lower edge; reserve overlay clearance only while controls are shown.
-        val controlsShown = !pictureInPicture && (visible || state.paused || state.playback == null)
+        val controlsShown = !pictureInPicture && (!tv || fullscreen || tvActive) && (visible || (!tv && state.paused) || state.playback == null)
         LaunchedEffect(controlsShown) { onControlsVisibility(controlsShown) }
-        LaunchedEffect(controlsShown, controlsSignal) {
-            if (tv && fullscreen && controlsShown && state.playback != null) transportFocus.requestFocus()
+        LaunchedEffect(controlsShown, controlsSignal, fullscreen, state.playback?.revision, state.paused, tvActive) {
+            if (tv && tvActive && controlsShown && state.playback != null) transportFocus.requestFocus()
         }
         val subtitleLineHeight = with(density) { 20.sp.toDp() }
         val captionInset = if (pictureInPicture) 4.dp else
@@ -295,43 +300,45 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
                 LinearProgressIndicator(progress = { if (duration > 0) elapsed.toFloat() / duration else 0f },
                         modifier = Modifier.fillMaxWidth().height(4.dp), color = Color(0xff389bea), trackColor = Color.White.copy(alpha = 0.3f))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    WebControl(if (state.paused) "Play" else "Pause", if (state.paused) "M8 5v14l11-7z" else "M6 5h4v14H6zm8 0h4v14h-4z", state.playback != null, if (tv) Modifier.focusRequester(transportFocus) else Modifier) { interact(model::togglePause) }
+                    WebControl(if (state.paused) "Play" else "Pause", if (state.paused) "M8 5v14l11-7z" else "M6 5h4v14H6zm8 0h4v14h-4z", state.playback != null, if (tv) controlModifier.focusProperties { left = FocusRequester.Cancel }.focusRequester(transportFocus) else Modifier) { interact(model::togglePause) }
                     Text("${clock(elapsed)} / ${clock(duration)}", color = Color.White, fontSize = 10.sp)
                     Spacer(Modifier.weight(1f))
-                    WebControl(if (silent) "Unmute" else "Mute", if (silent) "M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.4 2.4-1.4 1.4-2.4-2.4-2.4 2.4-1.4-1.4 2.4-2.4-2.4-2.4 1.4-1.4 2.4 2.4 2.4-2.4 1.4 1.4z" else "M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z") { interact { model.toggleMute(); menu = false } }
+                    WebControl(if (silent) "Unmute" else "Mute", if (silent) "M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.4 2.4-1.4 1.4-2.4-2.4-2.4 2.4-1.4-1.4 2.4-2.4-2.4-2.4 1.4-1.4 2.4 2.4 2.4-2.4 1.4 1.4z" else "M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z", modifier = controlModifier) { interact { model.toggleMute(); menu = false } }
                     Box {
-                        WebControl("Settings", "M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z") { interact { menu = !menu; page = null } }
+                        WebControl("Settings", "M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z", modifier = controlModifier) { interact { menu = !menu; page = null } }
                         PlayerPopup(expanded = menu, onDismiss = { if (page != null) page = null else menu = false }) {
+                                key(page) {
                                 when (page) {
                                     null -> listOf("Quality", "Audio Tracks", "Subtitles").forEach { label ->
-                                        PlayerMenuItem(text = { Text(label) }, onClick = { interact { page = label } })
+                                        PlayerMenuItem(text = { Text(label) }, onClick = { interact { page = label } }, autofocus = tv && label == "Quality")
                                     }
                                     "Quality" -> {
                                         PlayerMenuItem(text = { Text("‹ Quality") }, onClick = { page = null })
-                                        (listOf(0) + listOf(360, 480, 720).filter { it <= (state.playback?.sourceHeight ?: 720) }).forEach { height ->
+                                        (listOf(0) + (listOf(360, 480, 720) + state.quality).distinct().filter { it > 0 && (it <= (state.playback?.sourceHeight ?: 720) || it == state.quality) }).forEach { height ->
                                             PlayerMenuItem(text = { Text((if (height == state.quality) "✓ " else "") + if (height == 0) "Auto" else "${height}p") },
-                                                onClick = { menu = false; interact { model.setQuality(height) } })
+                                                onClick = { menu = false; interact { model.setQuality(height) } }, autofocus = tv && height == state.quality)
                                         }
                                     }
                                     "Audio Tracks" -> {
                                         PlayerMenuItem(text = { Text("‹ Audio Tracks") }, onClick = { page = null })
                                         if (state.playback?.audioTracks.isNullOrEmpty()) PlayerMenuItem(text = { Text("No audio tracks") }, enabled = false, onClick = {})
                                         state.playback?.audioTracks?.forEach { track ->
-                                            PlayerMenuItem(text = { Text(track.label) }, onClick = { menu = false; interact { model.setAudio(track) } })
+                                            PlayerMenuItem(text = { Text((if (track.index == state.playback?.selectedAudioIndex) "✓ " else "") + track.label) }, onClick = { menu = false; interact { model.setAudio(track) } }, autofocus = tv && track.index == state.playback?.selectedAudioIndex)
                                         }
                                     }
                                     "Subtitles" -> {
                                         PlayerMenuItem(text = { Text("‹ Subtitles") }, onClick = { page = null })
-                                        PlayerMenuItem(text = { Text("Off") }, onClick = { menu = false; interact { model.setSubtitle(null) } })
+                                        PlayerMenuItem(text = { Text((if (state.subtitleIndex == null) "✓ " else "") + "Off") }, onClick = { menu = false; interact { model.setSubtitle(null) } }, autofocus = tv && state.subtitleIndex == null)
                                         state.playback?.subtitleTracks?.forEach { track ->
-                                            PlayerMenuItem(text = { Text(track.label) }, onClick = { menu = false; interact { model.setSubtitle(track.index) } })
+                                            PlayerMenuItem(text = { Text((if (track.index == state.subtitleIndex) "✓ " else "") + track.label) }, onClick = { menu = false; interact { model.setSubtitle(track.index) } }, autofocus = tv && track.index == state.subtitleIndex)
                                         }
                                         captionStatus?.let { text -> PlayerMenuItem(text = { Text(text) }, enabled = false, onClick = {}) }
                                     }
                                 }
+                                }
                         }
                     }
-                    WebControl(if (fullscreen) "Exit fullscreen" else "Fullscreen", "M5 5h5v2H7v3H5V5zm9 0h5v5h-2V7h-3V5zM5 14h2v3h3v2H5v-5zm12 0h2v5h-5v-2h3v-3z") { interact(onFullscreen) }
+                    WebControl(if (fullscreen) "Exit fullscreen" else "Fullscreen", "M5 5h5v2H7v3H5V5zm9 0h5v5h-2V7h-3V5zM5 14h2v3h3v2H5v-5zm12 0h2v5h-5v-2h3v-3z", modifier = controlModifier.then(if (tv) Modifier.focusProperties { right = FocusRequester.Cancel } else Modifier)) { interact(onFullscreen) }
                 }
             }
         }
@@ -383,8 +390,10 @@ private fun PlayerPopup(expanded: Boolean, onDismiss: () -> Unit,
 
 /** Compact menu rows retain distinct clickable choices without Material's extra vertical spacing. */
 @Composable
-private fun PlayerMenuItem(text: @Composable () -> Unit, onClick: () -> Unit, enabled: Boolean = true) {
-    Box(Modifier.widthIn(min = 128.dp, max = 240.dp).clickable(enabled = enabled, onClick = onClick)
+private fun PlayerMenuItem(text: @Composable () -> Unit, onClick: () -> Unit, enabled: Boolean = true, autofocus: Boolean = false) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(autofocus) { if (autofocus) { withFrameNanos { }; focus.requestFocus() } }
+    Box(Modifier.focusRequester(focus).tvFocusOutline().widthIn(min = 128.dp, max = 240.dp).clickable(enabled = enabled, onClick = onClick)
         .padding(horizontal = 12.dp, vertical = 8.dp)) {
         ProvideTextStyle(MaterialTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = if (enabled) 1f else 0.5f))) { text() }
     }

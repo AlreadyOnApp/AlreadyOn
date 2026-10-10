@@ -30,7 +30,7 @@ import java.util.Locale
 
 /** One focus target per channel avoids hundreds of invisible Compose focus/layout nodes on small TVs. */
 @Composable
-internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifier, onTune: (GuideChannel) -> Unit) {
+internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifier, resetSignal: Int = 0, onChannelFocus: (Long, Boolean) -> Unit = { _, _ -> }, onTune: (GuideChannel) -> Unit) {
     val channels = state.channels
     val rows = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -43,9 +43,10 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
     }
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = System.currentTimeMillis() } }
     // Restoring the guide always restores the selected channel, independent of stream readiness.
-    LaunchedEffect(channels.isNotEmpty(), state.profile?.id) {
+    LaunchedEffect(channels.isNotEmpty(), state.profile?.id, resetSignal) {
         if (channels.isNotEmpty()) {
             val index = channels.indexOfFirst { it.id == state.channel?.id }.coerceAtLeast(0)
+            selectedTime = System.currentTimeMillis(); origin = selectedTime / 1_800_000 * 1_800_000
             rows.scrollToItem(index)
             withFrameNanos { }
             targets[channels[index].id]?.requestFocus()
@@ -73,12 +74,16 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                 } }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val windowMs = ((maxWidth.value - 100) / 4 * 60_000).toLong()
+                    fun reportFocus() {
+                        val current = programs.find { System.currentTimeMillis() >= it.second && System.currentTimeMillis() < it.third }
+                        onChannelFocus(channel.id, current != null && selectedTime >= current.second && selectedTime < current.third)
+                    }
                     fun reveal(start: Long) {
                         if (start < origin) origin = start / 1_800_000 * 1_800_000
                         else if (start >= origin + windowMs) origin = start / 1_800_000 * 1_800_000
                     }
                     Box(Modifier.fillMaxWidth().height(72.dp).focusRequester(targets.getValue(channel.id))
-                            .onFocusChanged { focused = it.hasFocus }
+                            .onFocusChanged { focused = it.hasFocus; if (it.isFocused) reportFocus() }
                             .semantics(mergeDescendants = true) { contentDescription = "Channel ${channel.number}: ${channel.name}" }
                             .onPreviewKeyEvent { event ->
                                 if (event.key !in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) false
@@ -95,7 +100,7 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                                         } else {
                                             val current = programs.indexOfFirst { selectedTime >= it.second && selectedTime < it.third }.coerceAtLeast(0)
                                             val next = current + if (event.key == Key.DirectionRight) 1 else -1
-                                            programs.getOrNull(next)?.let { selectedTime = it.second + 1; reveal(it.second) }
+                                            programs.getOrNull(next)?.let { selectedTime = it.second + 1; reveal(it.second); reportFocus() }
                                         }
                                     }
                                     true

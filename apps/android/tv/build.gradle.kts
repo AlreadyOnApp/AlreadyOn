@@ -30,6 +30,7 @@ android {
             applicationIdSuffix = ".tv.debug"
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = false
+            resValue("string", "app_name", "AlreadyOn TV Test")
             matchingFallbacks += listOf("release")
         }
     }
