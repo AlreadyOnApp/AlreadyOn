@@ -40,6 +40,8 @@ import java.io.ByteArrayOutputStream
 internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
     val profile = state.profile ?: return
     val tv = BuildConfig.IS_TV
+    var mounted by remember { mutableStateOf(true) }
+    DisposableEffect(Unit) { onDispose { mounted = false } }
     val sections = listOf("Display Name", "Icon", "PIN", "Time Format", "Audio Language", "Subtitles")
     var section by remember { mutableStateOf(sections.first()) }
     val sidebarFocus = remember { sections.associateWith { FocusRequester() } }
@@ -192,7 +194,14 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
                         if (audio != profile.language) patch.put("audioLanguage", audio)
                         if (subtitles != profile.subtitles) patch.put("subtitlesEnabled", subtitles)
                         if (language != profile.subtitleLanguage) patch.put("subtitleLanguage", language)
-                        model.saveProfile(patch, upload)
+                        model.saveProfile(patch, upload, keepOpen = tv) { saved ->
+                            if (!mounted) return@saveProfile
+                            // Refresh the draft baseline only after the server accepts every save operation.
+                            name = saved.name; icon = saved.icon; upload = null
+                            time = saved.timeFormat; audio = saved.language
+                            subtitles = saved.subtitles; language = saved.subtitleLanguage
+                            if (tv) sidebarFocus.getValue(section).requestFocus()
+                        }
                     }, enabled = changed && !state.busy && !processing && name.isNotBlank()) { Text("Save Changes") }
                     OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings, modifier = Modifier.tvFocusOutline()) { Text("Cancel") }
                 } }

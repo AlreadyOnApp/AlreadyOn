@@ -6,7 +6,7 @@ Use Up/Down to preview categories automatically. Select or Right focuses Name, t
 
 Categories are Display Name, Icon, PIN, Time Format, Audio Language and Subtitles. Icon shows the current avatar with Remove Icon alongside and presets below. Upload custom images through the WebUI. Subtitles uses an On/Off by Default button plus a language dropdown.
 
-**Save Changes** commits only changed name, icon, time-format and language/default-subtitle fields. Drafts survive category changes and are discarded when leaving without saving. PIN updates and removal apply separately; removal requires confirmation. **Cancel** or **Back To Guide** returns to the guide, restores playback and focuses the watched channel. Remote Back first closes a popup or keyboard, then moves from controls to the current sidebar category; Back from the sidebar returns to the guide.
+**Save Changes** commits only changed name, icon, time-format and language/default-subtitle fields. A successful save refreshes the draft, keeps the page open and focuses the current sidebar category. Failed saves keep the draft and show the error. Drafts survive category changes and are discarded when leaving without saving. PIN updates and removal apply separately; removal requires confirmation. **Cancel** or **Back To Guide** returns to the guide, restores playback and focuses the watched channel. Remote Back first closes a popup or keyboard, then moves from controls to the current sidebar category; Back from the sidebar returns to the guide.
 
 Only the current category is mounted; there are no animated assets or background guide refreshes while settings is open.
 

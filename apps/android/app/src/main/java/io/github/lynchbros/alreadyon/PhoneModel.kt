@@ -196,14 +196,17 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
     }
 
     /** Save only changed fields; unrelated edits from other clients remain intact. */
-    fun saveProfile(patch: JSONObject, upload: ByteArray? = null) = perform {
+    fun saveProfile(patch: JSONObject, upload: ByteArray? = null, keepOpen: Boolean = false, onSaved: (ViewerProfile) -> Unit = {}) = perform {
+        update { it.copy(notice = null) }
         val api = requireNotNull(client)
         val profile = state.value.profile ?: return@perform
         if (patch.length() > 0) api.request("/api/profiles/${profile.id}", "PATCH", patch)
         if (upload != null) api.request("/api/profiles/${profile.id}/icon", "POST", upload = upload)
         val profiles = api.profiles()
-        update { it.copy(profiles = profiles, profile = profiles.find { p -> p.id == profile.id }, settings = null) }
+        val stayInSettings = keepOpen && state.value.settings == "profile"
+        update { it.copy(profiles = profiles, profile = profiles.find { p -> p.id == profile.id }, settings = if (stayInSettings) it.settings else null, notice = if (stayInSettings) "Changes saved." else it.notice) }
         val updated = state.value.profile ?: return@perform
+        if (stayInSettings) { onSaved(updated); return@perform }
         val channels = api.guide(updated)
         update { it.copy(channels = channels) }
         restoreChannel(updated, channels)
