@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.SolidColor
@@ -234,6 +236,10 @@ private fun AccountPasswordField(label: String, value: String, changed: (String)
 internal fun ProfileScreen(state: PhoneState, model: PhoneModel) {
     var selected by remember { mutableStateOf<ViewerProfile?>(null) }
     var pin by remember { mutableStateOf("") }
+    val firstProfile = remember { FocusRequester() }
+    LaunchedEffect(state.profiles.firstOrNull()?.id, state.busy) {
+        if (BuildConfig.IS_TV && state.profiles.isNotEmpty() && !state.busy) firstProfile.requestFocus()
+    }
     val linkPixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_PT, 2f, LocalContext.current.resources.displayMetrics)
     val linkIncrease = with(LocalDensity.current) { linkPixels.toSp() }
     val linkStyle = MaterialTheme.typography.labelLarge.copy(
@@ -243,7 +249,9 @@ internal fun ProfileScreen(state: PhoneState, model: PhoneModel) {
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
         items(state.profiles, key = { it.id }) { profile ->
             Button(onClick = { if (profile.hasPin) { selected = profile; pin = "" } else model.selectProfile(profile, "") },
-                enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tvFocusOutline(), shape = RoundedCornerShape(4.dp)) {
+                enabled = !state.busy, modifier = Modifier.fillMaxWidth(if (BuildConfig.IS_TV) 0.5f else 1f).heightIn(min = 48.dp)
+                    .then(if (BuildConfig.IS_TV && profile.id == state.profiles.firstOrNull()?.id) Modifier.focusRequester(firstProfile) else Modifier)
+                    .tvFocusOutline(), shape = RoundedCornerShape(4.dp)) {
                 ProfileName(profile, model)
             }
         }

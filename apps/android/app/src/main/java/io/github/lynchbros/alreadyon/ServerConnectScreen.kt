@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.Alignment
@@ -69,6 +70,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     var pin by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var address by remember { mutableStateOf(state.origin) }
+    var manualEntry by remember { mutableStateOf(false) }
     var remaining by remember { mutableIntStateOf(30) }
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -82,7 +84,8 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
         focusManager.clearFocus(force = true)
         if (username.isNotBlank() && pin.length in 6..12) connectFocus.requestFocus()
     }
-    LaunchedEffect(scan) {
+    LaunchedEffect(scan, manualEntry) {
+        if (manualEntry) return@LaunchedEffect
         remaining = 30
         while (remaining > 0) { delay(1000); remaining-- }
     }
@@ -95,8 +98,8 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
             finally { checking = false }
         }
     }
-    DisposableEffect(scan, remaining == 0) {
-        if (remaining == 0) return@DisposableEffect onDispose {}
+    DisposableEffect(scan, remaining == 0, manualEntry, selected) {
+        if (remaining == 0 || manualEntry || selected != null) return@DisposableEffect onDispose {}
         val discovery = TvDiscovery(context, found = { server ->
             servers.removeAll { it.name == server.name }; servers.add(server)
         }, lost = { name -> servers.removeAll { it.name == name } }, failed = { error = it })
@@ -110,7 +113,8 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
         if (selected == null) {
             Text("Connect to your AlreadyOn server", style = MaterialTheme.typography.headlineSmall)
             Text("Select a server on your home network.")
-            if (remaining > 0) Text("Searching for local servers… ${remaining}s remaining")
+            if (manualEntry) Text("Enter your server’s HTTPS address.")
+            else if (remaining > 0) Text("Searching for local servers… ${remaining}s remaining")
             else Text(if (servers.isEmpty()) "No local server found. Enter its HTTPS address below." else "Select a server or enter an HTTPS address below.")
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 servers.forEach { server ->
@@ -119,8 +123,8 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     }, enabled = !checking && !state.busy) { Text("${server.name} · ${server.origin.removePrefix("https://")}") }
                 }
             }
-            if (remaining == 0) {
-                OutlinedTextField(address, { address = it }, label = { Text("HTTPS server address") },
+            if (BuildConfig.IS_TV || remaining == 0) {
+                OutlinedTextField(address, { address = it; manualEntry = true }, label = { Text("HTTPS server address") },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
                 Button(modifier = Modifier.tvFocusOutline(), onClick = {
                     val origin = serverOrigin(address)
@@ -128,7 +132,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     else select(TvServer("AlreadyOn server", origin))
                 }, enabled = address.isNotBlank() && !checking && !state.busy) { Text("Check Server") }
             }
-            Button(modifier = Modifier.tvFocusOutline(), onClick = { servers.clear(); error = null; remaining = 30; scan++ }) { Text("Rescan") }
+            Button(modifier = Modifier.tvFocusOutline(), onClick = { servers.clear(); error = null; manualEntry = false; remaining = 30; scan++ }) { Text("Rescan") }
         } else {
             Text("${selected!!.name} · ${selected!!.origin.removePrefix("https://")}", style = MaterialTheme.typography.headlineSmall)
             if (checking) Text("Checking server…")
@@ -137,7 +141,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = if (BuildConfig.IS_TV) ImeAction.Next else ImeAction.Default),
                     keyboardActions = KeyboardActions(onNext = { if (BuildConfig.IS_TV) enterPin() }, onDone = { if (BuildConfig.IS_TV) enterPin() }),
-                    modifier = Modifier.fillMaxWidth().onPreviewKeyEvent {
+                    modifier = Modifier.fillMaxWidth(if (BuildConfig.IS_TV) 0.6f else 1f).onPreviewKeyEvent {
                         if (BuildConfig.IS_TV && (it.key == Key.Enter || it.key == Key.NumPadEnter)) {
                             if (it.type == KeyEventType.KeyUp) enterPin()
                             true
@@ -149,7 +153,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
                 else OutlinedTextField(pin, {}, label = { Text("TV PIN") }, readOnly = true,
                     singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth().focusRequester(pinFocus).onFocusChanged {
+                    modifier = Modifier.fillMaxWidth(0.6f).focusRequester(pinFocus).onFocusChanged {
                         if (it.isFocused) { keyboard?.hide(); pinKeypad = true }
                     }, enabled = !state.busy)
                 Button(modifier = Modifier.focusRequester(connectFocus).tvFocusOutline(), onClick = { model.signInWithPIN(selected!!.origin, username, pin, trust!!.certificate); pin = "" },
@@ -163,7 +167,12 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     }
     if (BuildConfig.IS_TV && pinKeypad) Dialog(onDismissRequest = { closePin() }) {
         val firstDigit = remember { FocusRequester() }
-        LaunchedEffect(Unit) { firstDigit.requestFocus() }
+        val keypadView = LocalView.current
+        // The dialog must own window focus before assigning focus to its first key.
+        LaunchedEffect(Unit) {
+            while (!keypadView.hasWindowFocus()) delay(16)
+            firstDigit.requestFocus()
+        }
         Surface(shape = MaterialTheme.shapes.large) {
             Column(Modifier.width(360.dp).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
