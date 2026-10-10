@@ -389,20 +389,20 @@ internal fun isLoopback(host: String): Boolean {
 
 // Keep the app wordmark and launcher icon on the shared, font-free brand paths.
 @Composable
-internal fun PhoneBrand() {
+internal fun PhoneBrand(scale: Float = 1f) {
     // Wordmark visible height is 88/601 of its width; icon padding is 80/108.
-    val wordmarkHeight = 170.dp * (88f / 601f)
+    val wordmarkHeight = 170.dp * scale * (88f / 601f)
     val iconSize = wordmarkHeight * 1.05f * (108f / 80f)
     Column {
         Row(verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(8.dp * scale)) {
             Image(painterResource(R.drawable.ic_brand), contentDescription = null,
                 modifier = Modifier.size(iconSize).offset(y = -iconSize * (5.5f / 108f) - wordmarkHeight * .025f),
                 contentScale = ContentScale.Fit)
             Image(painterResource(R.drawable.brand_wordmark), contentDescription = "AlreadyOn",
-                modifier = Modifier.width(170.dp).height(32.dp), contentScale = ContentScale.Fit)
+                modifier = Modifier.width(170.dp * scale).height(32.dp * scale), contentScale = ContentScale.Fit)
         }
-        Text("Your library, tuned to you", modifier = Modifier.padding(start = iconSize + 8.dp).offset(y = (-4).dp),
-            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Your library, tuned to you", modifier = Modifier.padding(start = iconSize + 8.dp * scale).offset(y = (-4).dp * scale),
+            style = MaterialTheme.typography.labelSmall.let { it.copy(fontSize = it.fontSize * scale, lineHeight = it.lineHeight * scale) }, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -73,7 +73,8 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
     PhoneTheme {
         val palette = phonePalette
         Surface(Modifier.fillMaxSize(), color = palette.background, contentColor = palette.text) {
-        Column(Modifier.fillMaxSize().padding(if (fullscreen) 0.dp else 16.dp)
+        Column(Modifier.fillMaxSize().padding(horizontal = if (fullscreen) 0.dp else 16.dp, vertical = if (fullscreen) 0.dp else 16.dp)
+            .padding(top = if (fullscreen) 0.dp else 12.dp)
             .onPreviewKeyEvent { event ->
                 if (state.tvTutorial) {
                     if (event.key == Key.Back) {

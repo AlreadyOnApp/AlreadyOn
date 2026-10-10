@@ -107,7 +107,7 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                         onChannelFocus(channel.id, current)
                         onSelection(channel, chosen?.first)
                     }
-                    Box(Modifier.fillMaxWidth().height(72.dp).focusRequester(targets.getValue(channel.id))
+                    Box(Modifier.fillMaxWidth().height(56.dp).focusRequester(targets.getValue(channel.id))
                             .onFocusChanged { focused = it.hasFocus; if (it.isFocused) reportFocus() }
                             .semantics(mergeDescendants = true) { contentDescription = "Channel ${channel.number}: ${channel.name}"; stateDescription = programs.getOrNull(selectionIndex())?.let { "${it.first.title} · ${it.first.startsAt}" }.orEmpty() }
                             .onPreviewKeyEvent { event ->
@@ -166,7 +166,7 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                                     val label = (if (current) "Now · " else "") + format.format(Instant.ofEpochMilli(if (current) end else start))
                                     drawIntoCanvas { canvas ->
                                         canvas.nativeCanvas.drawText(TextUtils.ellipsize(label, labelPaint, available, TextUtils.TruncateAt.END).toString(), left+4.dp.toPx(), 17.dp.toPx(), labelPaint)
-                                        labelPaint.textSize = 14.dp.toPx()
+                                        labelPaint.textSize = 13.dp.toPx()
                                         canvas.nativeCanvas.drawText(TextUtils.ellipsize(program.title, labelPaint, available, TextUtils.TruncateAt.END).toString(), left+4.dp.toPx(), 39.dp.toPx(), labelPaint)
                                     }
                                 }
