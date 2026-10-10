@@ -71,6 +71,8 @@ module.exports = async ({ browser, login, url, assert, root, seed }) => {
 
     await page.getByRole('button', { name: /^Profile:/ }).click();
     await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
+    // Logout reloads the document asynchronously; finish that navigation before login starts another.
+    await page.getByRole('dialog', { name: 'Sign In', exact: true }).waitFor();
     await expectTune(page, () => login(page), 999, admin.id);
     const fresh = await browser.newContext();
     try {
