@@ -12,9 +12,9 @@ import (
 
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
-	"github.com/lynchbros/alreadyon/server/internal/auth"
-	"github.com/lynchbros/alreadyon/server/internal/logging"
-	"github.com/lynchbros/alreadyon/server/internal/status"
+	"github.com/alreadyonapp/alreadyon/server/internal/auth"
+	"github.com/alreadyonapp/alreadyon/server/internal/logging"
+	"github.com/alreadyonapp/alreadyon/server/internal/status"
 )
 
 // NewRouter returns the top-level HTTP handler for the management

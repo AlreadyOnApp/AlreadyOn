@@ -1,5 +1,5 @@
 // Shared phone/tablet and TV discovery, address fallback and account PIN onboarding.
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll

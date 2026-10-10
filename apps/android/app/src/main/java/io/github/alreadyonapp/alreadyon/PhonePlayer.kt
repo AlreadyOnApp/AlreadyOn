@@ -1,4 +1,4 @@
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import android.os.SystemClock
 import androidx.compose.foundation.gestures.detectVerticalDragGestures

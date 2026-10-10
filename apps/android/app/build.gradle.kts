@@ -7,10 +7,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 android {
-    namespace = "io.github.lynchbros.alreadyon"
+    namespace = "io.github.alreadyonapp.alreadyon"
     compileSdk = 36
     defaultConfig {
-        applicationId = "io.github.lynchbros.alreadyon"
+        applicationId = "io.github.alreadyonapp.alreadyon"
         minSdk = 26
         targetSdk = 36
         buildConfigField("boolean", "IS_TV", "false")

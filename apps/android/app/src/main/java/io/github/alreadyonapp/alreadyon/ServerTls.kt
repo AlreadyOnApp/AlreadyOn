@@ -1,4 +1,4 @@
-package io.github.lynchbros.alreadyon
+package io.github.alreadyonapp.alreadyon
 
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient

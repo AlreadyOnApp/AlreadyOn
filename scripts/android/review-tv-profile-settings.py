@@ -13,7 +13,7 @@ def main():
     parser.add_argument('--sdk', type=Path, required=True)
     args = parser.parse_args()
     adb = [str(args.sdk / 'platform-tools/adb'), '-s', args.serial]
-    package = 'io.github.lynchbros.alreadyon.tv.debug'
+    package = 'io.github.alreadyonapp.alreadyon.tv.debug'
 
     def run(*words):
         return subprocess.check_output(adb + list(words), text=True, timeout=30)
@@ -42,7 +42,7 @@ def main():
         return ''
 
     run('shell', 'am', 'force-stop', package)
-    run('shell', 'am', 'start', '-W', '-n', f'{package}/io.github.lynchbros.alreadyon.MainActivity')
+    run('shell', 'am', 'start', '-W', '-n', f'{package}/io.github.alreadyonapp.alreadyon.MainActivity')
     time.sleep(3)
     key(20)
     key(4)

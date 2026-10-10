@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/lynchbros/alreadyon/server/internal/auth"
-	"github.com/lynchbros/alreadyon/server/internal/config"
-	"github.com/lynchbros/alreadyon/server/internal/library"
-	"github.com/lynchbros/alreadyon/server/internal/playback"
-	"github.com/lynchbros/alreadyon/server/internal/schedule"
+	"github.com/alreadyonapp/alreadyon/server/internal/auth"
+	"github.com/alreadyonapp/alreadyon/server/internal/config"
+	"github.com/alreadyonapp/alreadyon/server/internal/library"
+	"github.com/alreadyonapp/alreadyon/server/internal/playback"
+	"github.com/alreadyonapp/alreadyon/server/internal/schedule"
 )
 
 // TEMPORARY testing tool: remove this handler and player control before release.

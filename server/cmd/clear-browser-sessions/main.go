@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lynchbros/alreadyon/server/internal/auth"
-	"github.com/lynchbros/alreadyon/server/internal/config"
-	"github.com/lynchbros/alreadyon/server/internal/storage"
+	"github.com/alreadyonapp/alreadyon/server/internal/auth"
+	"github.com/alreadyonapp/alreadyon/server/internal/config"
+	"github.com/alreadyonapp/alreadyon/server/internal/storage"
 )
 
 func main() {

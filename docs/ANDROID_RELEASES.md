@@ -25,3 +25,7 @@ Date PRs run quality, CodeQL and full Go/browser e2e. Dev merge validation publi
 ## Signing and scope
 
 Phone/tablet and [TV](GOOGLE_TV.md) APKs share permanent signing credentials and provenance. Debug apps use separate identities; validate physical devices. See [signing](ANDROID_SIGNING.md), [release notes](RELEASE_NOTES.md) and [delivery](CI_CD.md).
+
+## Application identity
+
+Android packages use the GitHub organization-owned application identity. Android treats an application ID change as a different app, so previously installed previews cannot be updated in place. Uninstall the earlier preview before installing this version; app-local settings are not transferred.
