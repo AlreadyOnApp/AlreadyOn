@@ -6,9 +6,9 @@ Web assets are opened inside the installed web directory with `os.OpenInRoot`. T
 
 Sign-in return URLs are parsed using the browser URL parser and compared with the current origin before navigation. Checking a raw string prefix alone is insufficient because URL parsing normalizes control characters.
 
-Generated management keys contain 256 random bits and retain indexed SHA-256 verification. Chosen local testing keys use salted Argon2id and the bounded password-hashing pool. Verification examines only testing records. Keep their number small; use generated keys on deployed servers. Existing testing keys retain their IDs and upgrade on successful authentication or reprovisioning; untouched records keep their old hashes until then. No default key exists. Revocation and enabled-owner checks apply to both types.
+Generated management keys contain 256 random bits and retain indexed SHA-256 verification. Chosen local testing keys use salted Argon2id and the bounded password-hashing pool. Verification examines only testing records. Keep their number small; use generated keys on deployed servers. Legacy local test-key hashes do not authenticate; local reprovisioning removes those obsolete rows, so old test keys must be provisioned again. No default key exists. Revocation and enabled-owner checks apply to both types.
 
-The existing key table stores both hash formats without a schema migration. Older binaries cannot authenticate newly provisioned or upgraded Argon2id testing keys; generated keys remain compatible. A failed migration refuses authentication rather than restoring a revoked key.
+The existing key table stores generated-key SHA-256 and testing-key Argon2id hashes without a schema migration. Older binaries cannot authenticate newly provisioned Argon2id testing keys; generated keys remain compatible. Legacy testing hashes fail closed and are removed on local reprovisioning.
 
 Direct-playback responses explicitly use `application/octet-stream` with `nosniff`; manifests and segments retain their specific media types, and subtitle cues are JSON. Generic response wrappers forward bytes without converting them to HTML. Byte-range support and idle write deadlines remain active.
 
