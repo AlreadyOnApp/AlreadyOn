@@ -314,7 +314,7 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
                                     }
                                     "Quality" -> {
                                         PlayerMenuItem(text = { Text("‹ Quality") }, onClick = { page = null })
-                                        (listOf(0) + (listOf(360, 480, 720) + state.quality).distinct().filter { it > 0 && (it <= (state.playback?.sourceHeight ?: 720) || it == state.quality) }).forEach { height ->
+                                        (listOf(0) + (listOf(1080, 720, 480, 360) + state.quality).distinct().sortedDescending().filter { it > 0 && (it <= (state.playback?.sourceHeight ?: 720) || it == state.quality) }).forEach { height ->
                                             PlayerMenuItem(text = { Text((if (height == state.quality) "✓ " else "") + if (height == 0) "Auto" else "${height}p") },
                                                 onClick = { menu = false; interact { model.setQuality(height) } }, autofocus = tv && height == state.quality)
                                         }
@@ -322,14 +322,14 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
                                     "Audio Tracks" -> {
                                         PlayerMenuItem(text = { Text("‹ Audio Tracks") }, onClick = { page = null })
                                         if (state.playback?.audioTracks.isNullOrEmpty()) PlayerMenuItem(text = { Text("No audio tracks") }, enabled = false, onClick = {})
-                                        state.playback?.audioTracks?.forEach { track ->
+                                        state.playback?.audioTracks?.preferredFirst(state.profile?.language)?.forEach { track ->
                                             PlayerMenuItem(text = { Text((if (track.index == state.playback?.selectedAudioIndex) "✓ " else "") + track.label) }, onClick = { menu = false; interact { model.setAudio(track) } }, autofocus = tv && track.index == state.playback?.selectedAudioIndex)
                                         }
                                     }
                                     "Subtitles" -> {
                                         PlayerMenuItem(text = { Text("‹ Subtitles") }, onClick = { page = null })
                                         PlayerMenuItem(text = { Text((if (state.subtitleIndex == null) "✓ " else "") + "Off") }, onClick = { menu = false; interact { model.setSubtitle(null) } }, autofocus = tv && state.subtitleIndex == null)
-                                        state.playback?.subtitleTracks?.forEach { track ->
+                                        state.playback?.subtitleTracks?.preferredFirst(state.profile?.subtitleLanguage)?.forEach { track ->
                                             PlayerMenuItem(text = { Text((if (track.index == state.subtitleIndex) "✓ " else "") + track.label) }, onClick = { menu = false; interact { model.setSubtitle(track.index) } }, autofocus = tv && track.index == state.subtitleIndex)
                                         }
                                         captionStatus?.let { text -> PlayerMenuItem(text = { Text(text) }, enabled = false, onClick = {}) }

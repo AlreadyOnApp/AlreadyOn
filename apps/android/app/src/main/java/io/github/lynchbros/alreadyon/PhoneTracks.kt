@@ -13,6 +13,15 @@ import java.util.concurrent.TimeUnit
 
 // Source-file track indices are scoped to the current tune, never to another scheduled file.
 internal data class PhoneTrack(val index: Int, val label: String, val language: String = "und")
+// Compare ISO-639 two/three-letter tags; stable sorting preserves source order within each language.
+internal fun List<PhoneTrack>.preferredFirst(preference: String?): List<PhoneTrack> {
+    fun language(code: String): String {
+        val tag = code.trim().lowercase(java.util.Locale.ROOT).replace('_', '-').substringBefore('-')
+        return runCatching { java.util.Locale.forLanguageTag(tag).isO3Language }.getOrDefault(tag)
+    }
+    val preferred = language(preference?.takeUnless { it.isBlank() || it == "und" } ?: "en")
+    return sortedBy { track -> when (language(track.language)) { preferred -> 0; "eng" -> 1; else -> 2 } }
+}
 internal fun phoneTracks(data: JSONArray?): List<PhoneTrack> = if (data == null) emptyList() else List(data.length()) {
     val track = data.getJSONObject(it)
     PhoneTrack(track.getInt("index"), listOf(track.optString("language", "und"), track.optString("title"), track.optString("codec")).filter { value -> value.isNotBlank() }.joinToString(" · "), track.optString("language", "und"))
