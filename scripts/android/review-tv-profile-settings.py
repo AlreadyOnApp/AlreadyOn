@@ -46,6 +46,7 @@ def main():
     time.sleep(3)
     key(20)
     key(4)
+    watching = focused(snapshot())
     key(4)
     assert focused(snapshot()) in ('Pause', 'Play')
     key(19)
@@ -56,28 +57,43 @@ def main():
     tree = snapshot()
     assert 'CHANNEL' not in texts(tree) and 'Profile Settings' in texts(tree)
     assert focused(tree) == 'Display Name'
-    for category, expected in [('Icon', 'Upload Custom Icon'), ('PIN', 'Status'), ('Guide Display', 'Time Format'), ('Audio', 'Preferred Audio Language'), ('Subtitles', 'Subtitles By Default')]:
+    for category, expected, target in [
+        ('Icon', 'Remove Icon', '🦊'),
+        ('PIN', 'Status', None),
+        ('Time Format', 'Time Format', '▾'),
+        ('Audio Language', 'Audio Language', '▾'),
+        ('Subtitles', 'Default Language', 'by Default')]:
         key(20)
-        key(23)
         tree = snapshot()
         assert any(expected in value for value in texts(tree)), (category, texts(tree))
-        assert focused(tree) == category
-        print('PASS: settings category', category, flush=True)
+        assert focused(tree) == category, 'Sidebar focus must load the card without Select'
+        if category == 'Icon': assert 'Upload Custom Icon' not in texts(tree)
+        if category == 'Time Format': assert 'Guide Display' not in texts(tree)
+        if category == 'Audio Language': assert 'Preferred Audio Language' not in texts(tree)
+        key(22)
+        tree = snapshot()
+        actual = focused(tree)
+        assert (target in actual if target else actual in ('Set PIN', 'Clear PIN')), (category, actual)
+        key(21)
+        assert focused(snapshot()) == category, 'Left must return to its sidebar category'
+        key(23)
+        actual = focused(snapshot())
+        assert (target in actual if target else actual in ('Set PIN', 'Clear PIN')), (category, actual)
+        key(21)
+        print('PASS: automatic card and Right/Select entry', category, flush=True)
     key(22)
+    before = focused(snapshot())
     key(23)
-    tree = snapshot()
-    assert focused(tree).startswith('✓ '), 'Language menu must focus current value'
-    original = focused(tree)
-    key(20)
-    key(23)
-    tree = snapshot()
-    assert 'Save Changes' in texts(tree)
-    assert not any(original.removeprefix('✓ ') + ' ▾' == value for value in texts(tree)), 'Language choice must update the draft'
-    print('PASS: language current focus and editable draft', flush=True)
+    after = focused(snapshot())
+    assert before != after and 'by Default' in after, 'Subtitle default button must toggle the draft'
     key(4)
-    tree = snapshot()
-    assert 'CHANNEL' in texts(tree), 'Back must restore the guide'
-    print('PASS: profile settings menu, fullscreen categories, remote focus, Back to guide; no live settings changed')
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        tree = snapshot()
+        if focused(tree) == watching: break
+    else: raise AssertionError('Back must focus the watched channel after restoration')
+    print('PASS: subtitle draft toggle and Back to watched channel; no live settings changed')
+
 
 
 if __name__ == '__main__':
