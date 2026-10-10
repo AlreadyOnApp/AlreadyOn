@@ -56,9 +56,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.input.key.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.net.URI
 import java.time.Instant
@@ -285,7 +282,7 @@ internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePa
         "24h" -> "HH:mm"; "12h-padded" -> "hh:mma"; else -> "h:mma"
     }, Locale.US).withZone(ZoneId.systemDefault()) }
     val rows = rememberLazyListState()
-    LaunchedEffect(state.channel?.id) {
+    LaunchedEffect(state.channel?.id, channels) {
         val index = channels.indexOfFirst { it.id == state.channel?.id }
         if (index >= 0) rows.scrollToItem(index)
     }
@@ -296,10 +293,6 @@ internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePa
         while (true) { now = System.currentTimeMillis(); delay(30_000) }
     }
     val currentProgramFocus = remember { FocusRequester() }
-    val channelFocus = remember(channels.map { it.id }) { channels.associate { it.id to FocusRequester() } }
-    val navigation = rememberCoroutineScope()
-    val viewportWidth = LocalConfiguration.current.screenWidthDp - 100
-    val pixelsPerDp = LocalDensity.current.density
     val focusChannel = channels.firstOrNull { it.id == state.channel?.id }
         ?: channels.firstOrNull { channel -> channel.programs.any {
             Instant.parse(it.startsAt).toEpochMilli() <= now && Instant.parse(it.endsAt).toEpochMilli() > now
@@ -307,12 +300,12 @@ internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePa
     val focusProgram = focusChannel?.programs?.firstOrNull {
         Instant.parse(it.startsAt).toEpochMilli() <= now && Instant.parse(it.endsAt).toEpochMilli() > now
     }
-    LaunchedEffect(if (BuildConfig.IS_TV) state.profile?.id else focusChannel?.id, if (BuildConfig.IS_TV) null else focusProgram?.startsAt) {
+    LaunchedEffect(focusChannel?.id, focusProgram?.startsAt) {
         if (focusChannel != null && focusProgram != null) {
             rows.scrollToItem(channels.indexOf(focusChannel))
             scroll.scrollTo(0)
             withFrameNanos { } // Allow a lazily composed airing to attach its focus target.
-            if (BuildConfig.IS_TV) channelFocus[focusChannel.id]?.requestFocus() else currentProgramFocus.requestFocus()
+            currentProgramFocus.requestFocus()
         }
     }
     val localNow = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
@@ -331,24 +324,9 @@ internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePa
         LazyColumn(state = rows, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (channels.isEmpty()) item { Text("No channels are available for this profile.") }
             items(channels, key = { it.id }) { channel ->
-                // Explicit row navigation reaches lazily composed neighbors in both directions.
-                Row(Modifier.fillMaxWidth().height(72.dp).onPreviewKeyEvent { event ->
-                    if (!BuildConfig.IS_TV || event.key !in listOf(Key.DirectionUp, Key.DirectionDown)) false
-                    else {
-                        if (event.type == KeyEventType.KeyDown) {
-                            val target = channels.indexOf(channel) + if (event.key == Key.DirectionDown) 1 else -1
-                            if (target in channels.indices) navigation.launch {
-                                // Scroll only when the target is outside the visible rows.
-                                if (rows.layoutInfo.visibleItemsInfo.none { it.index == target }) rows.scrollToItem(target)
-                                withFrameNanos { }
-                                channelFocus[channels[target].id]?.requestFocus()
-                            } else return@onPreviewKeyEvent false
-                        }
-                        true
-                    }
-                }) {
+                Row(Modifier.fillMaxWidth().height(72.dp)) {
                     Surface(onClick = { onTune(channel) }, color = palette.alternate,
-                        shape = MaterialTheme.shapes.small, modifier = Modifier.width(100.dp).fillMaxHeight().then(if (BuildConfig.IS_TV) Modifier.focusRequester(channelFocus.getValue(channel.id)) else Modifier).tvFocusOutline()) {
+                        shape = MaterialTheme.shapes.small, modifier = Modifier.width(100.dp).fillMaxHeight().tvFocusOutline()) {
                         Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.Center) {
                             Text(channel.number.toString(), style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp))
                             Text(channel.name, maxLines = 2, style = MaterialTheme.typography.bodySmall)
@@ -356,21 +334,15 @@ internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePa
                     }
                     Box(Modifier.weight(1f).horizontalScroll(scroll)) {
                         Box(Modifier.width(width).fillMaxHeight()) {
-                            // Cache timestamp parsing and omit offscreen TV cells from the focus/layout tree.
-                            val timedPrograms = remember(channel.programs) { channel.programs.map {
-                                Triple(it, Instant.parse(it.startsAt).toEpochMilli(), Instant.parse(it.endsAt).toEpochMilli())
-                            } }
-                            val visibleStart = origin + (scroll.value / pixelsPerDp / minutesToDp * 60_000).toLong()
-                            val visibleEnd = visibleStart + (viewportWidth / minutesToDp * 60_000).toLong()
-                            timedPrograms.forEach { (program, begin, end) ->
-                                if (BuildConfig.IS_TV && (end <= visibleStart || begin >= visibleEnd)) return@forEach
+                            channel.programs.forEach { program ->
+                                val begin = Instant.parse(program.startsAt).toEpochMilli()
+                                val end = Instant.parse(program.endsAt).toEpochMilli()
                                 val left = ((begin - origin).coerceAtLeast(0) / 60_000f * minutesToDp).dp
                                 val block = ((end.coerceAtMost(origin + 12 * 60 * 60_000L) - begin.coerceAtLeast(origin)) / 60_000f * minutesToDp).coerceAtLeast(0f).dp
                                 if (block.value > 0) {
                                     val current = begin <= now && end > now
                                     Surface(onClick = { onTune(channel) }, modifier = Modifier.offset(x = left).width(block).fillMaxHeight().padding(start = 3.dp)
                                             .then(if (channel.id == focusChannel?.id && program == focusProgram) Modifier.focusRequester(currentProgramFocus) else Modifier)
-                                            .focusProperties { if (BuildConfig.IS_TV) canFocus = false }
                                             .tvFocusOutline()
                                             .then(if (current && channel.id == focusChannel?.id) Modifier.border(2.dp, Color.Red, MaterialTheme.shapes.small) else Modifier),
                                         color = if (current) palette.now else palette.surface, shape = MaterialTheme.shapes.small) {

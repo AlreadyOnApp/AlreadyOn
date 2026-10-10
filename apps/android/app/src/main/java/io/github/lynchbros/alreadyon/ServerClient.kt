@@ -130,10 +130,10 @@ internal class ServerClient(val origin: String, store: SessionStore, bypassTls: 
         }
     }
 
-    suspend fun guide(profile: ViewerProfile): List<GuideChannel> {
+    suspend fun guide(profile: ViewerProfile): List<GuideChannel> = withContext(Dispatchers.Default) {
         val tier = when (profile.tier) { "young_child", "teen", "adult" -> profile.tier; else -> "young_child" }
         val data = JSONArray(request("/api/guide?hours=12&audienceTier=$tier"))
-        return List(data.length()) { index ->
+        List(data.length()) { index ->
             val c = data.getJSONObject(index)
             val programs = c.getJSONArray("programs")
             GuideChannel(c.getLong("channelId"), c.getInt("number"), c.getString("name"),

@@ -234,7 +234,7 @@ paths:
       tags: [auth]
       security: []
       summary: Sign in with username and account TV PIN on the LAN
-      description: Requires HTTPS and a direct LAN peer. Subject to per-peer and aggregate failed-attempt limits and bounded credential concurrency. Disabled accounts or accounts requiring password changes cannot pair.
+      description: Requires HTTPS and a direct LAN peer. Subject to per-peer and aggregate failed-attempt limits and bounded credential concurrency. Disabled accounts or accounts requiring password changes cannot pair. Issues a persistent session until explicit sign-out or device revocation.
       requestBody:
         required: true
         content:
