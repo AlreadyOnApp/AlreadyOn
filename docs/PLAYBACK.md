@@ -18,6 +18,6 @@ Media paths must stay within configured roots. Serve only authorized resources a
 
 ## Validation
 
-Use synthetic fixtures for channel changes, seeking, program transitions, session expiry, concurrent viewers and failure recovery. Check direct, remux and transcode paths separately. Hardware and physical-device compatibility need their own evidence; browser automation cannot certify every GPU or television.
+Browser sign-in checks identify setup and login by the dialog’s accessible name so branded layouts do not require a heading. Use synthetic fixtures for channel changes, seeking, program transitions, session expiry, concurrent viewers and failure recovery. Check direct, remux and transcode paths separately. Hardware and physical-device compatibility need their own evidence; browser automation cannot certify every GPU or television.
 
 The temporary commercial-deletion tool is not a normal playback contract and must be removed before public release (tracking issue #199). See [scheduling](SCHEDULING.md), [TLS](TLS.md) and [runtime tests](../tests/integration/README.md).
