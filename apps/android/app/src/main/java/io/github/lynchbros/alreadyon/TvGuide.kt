@@ -51,7 +51,7 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
     }
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = System.currentTimeMillis() } }
     // Restoring the guide always restores the selected channel, independent of stream readiness.
-    LaunchedEffect(channels.isNotEmpty(), state.profile?.id, resetSignal) {
+    LaunchedEffect(channels.isNotEmpty(), state.profile?.id, state.channel?.id, resetSignal) {
         if (channels.isNotEmpty()) {
             val index = channels.indexOfFirst { it.id == state.channel?.id }.coerceAtLeast(0)
             selectedTime = System.currentTimeMillis(); origin = selectedTime / 1_800_000 * 1_800_000
