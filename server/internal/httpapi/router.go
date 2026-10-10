@@ -86,7 +86,7 @@ func NewRouterWithSessionCookie(webDir, uploadDir string, db *sql.DB, cookieName
 		}
 		mux.HandleFunc(method+" /api/auth/tv-pin", handler)
 	}
-	mux.HandleFunc("GET /api/auth/status", handleAuthStatus(db))
+	mux.HandleFunc("GET /api/auth/status", handleAuthStatus(db, cookieName))
 	mux.HandleFunc("POST /api/auth/setup", credentialHandler(handleAuthSetup(db, cookieName)))
 	mux.HandleFunc("POST /api/auth/login", credentialHandler(handleAuthLogin(db, loginLimiter, cookieName)))
 	mux.HandleFunc("POST /api/auth/logout", handleAuthLogout(db, cookieName))

@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import kotlinx.coroutines.delay
+import androidx.activity.compose.BackHandler
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Modifier
@@ -81,10 +84,26 @@ private fun NativeVideo(playback: PhonePlayback, model: PhoneModel, modifier: Mo
                 chain.proceed(original.newBuilder().url(scoped).removeHeader("Cookie").removeHeader("Authorization").build())
             }.build()
         val sources = DefaultMediaSourceFactory(context).setDataSourceFactory(OkHttpDataSource.Factory(http))
-        ExoPlayer.Builder(context).setMediaSourceFactory(sources).build().apply {
+        val builder = ExoPlayer.Builder(context).setMediaSourceFactory(sources)
+        if (BuildConfig.IS_TV) builder.setLoadControl(DefaultLoadControl.Builder()
+            .setBufferDurationsMs(5000, 15000, 500, 1000).setTargetBufferBytes(16 * 1024 * 1024).build())
+        builder.build().apply {
+            val preparedAt = SystemClock.elapsedRealtime()
             addListener(object : Player.Listener {
+                private var firstFrame = false
+                override fun onRenderedFirstFrame() {
+                    if (firstFrame) return
+                    firstFrame = true
+                    if (android.util.Log.isLoggable("AlreadyOnPlayback", android.util.Log.DEBUG)) android.util.Log.d("AlreadyOnPlayback", "First frame revision=${playback.revision} playerMs=${SystemClock.elapsedRealtime()-preparedAt} tuneMs=${SystemClock.elapsedRealtime()-playback.requestedAt}")
+                }
                 private var aligned = false
+                private var bufferingAt: Long? = null
                 override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_BUFFERING) bufferingAt = SystemClock.elapsedRealtime()
+                    if (playbackState == Player.STATE_READY) bufferingAt?.let {
+                        if (android.util.Log.isLoggable("AlreadyOnPlayback", android.util.Log.DEBUG)) android.util.Log.d("AlreadyOnPlayback", "Buffer ready revision=${playback.revision} durationMs=${SystemClock.elapsedRealtime()-it}")
+                        bufferingAt = null
+                    }
                     if (playbackState != Player.STATE_READY || aligned) return
                     aligned = true
                     // Map the server's muxer date onto the current sliding HLS window, not playlist zero.
@@ -109,7 +128,8 @@ private fun NativeVideo(playback: PhonePlayback, model: PhoneModel, modifier: Mo
         }
     }
     val positionCallback by rememberUpdatedState(onPosition)
-    LaunchedEffect(player) {
+    LaunchedEffect(player, playback.subtitleTracks.isNotEmpty()) {
+        if (playback.subtitleTracks.isEmpty()) return@LaunchedEffect
         while (true) {
             val window = Timeline.Window()
             var shift = 0.0
@@ -138,18 +158,19 @@ private fun NativeVideo(playback: PhonePlayback, model: PhoneModel, modifier: Mo
         hostView.keepScreenOn = true
         onDispose { hostView.keepScreenOn = previous }
     }
+    // TV uses the lower-power SurfaceView path; the phone retains its rotation-compatible TextureView.
     // TextureView participates in the Compose view's resizing instead of retaining an
     // independently composed SurfaceView buffer with stale bounds after Android 17 rotation.
     // Keep the same player and surface across display modes, preserving the stream and audio.
-    ContentFrame(player = player, modifier = modifier.clickable(onClick = onTap),
-        surfaceType = SURFACE_TYPE_TEXTURE_VIEW)
+    ContentFrame(player = player, modifier = if (BuildConfig.IS_TV) modifier else modifier.clickable(onClick = onTap),
+        surfaceType = if (BuildConfig.IS_TV) SURFACE_TYPE_SURFACE_VIEW else SURFACE_TYPE_TEXTURE_VIEW)
 }
 
 /** Overlay controls occupy the video surface; fullscreen never reserves guide or toolbar space. */
 @Composable
 internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifier, fullscreen: Boolean, pictureInPicture: Boolean = false,
     tv: Boolean = false, controlsSignal: Int = 0, onControlsVisibility: (Boolean) -> Unit = {},
-    onFullscreen: () -> Unit) {
+    onFullscreen: () -> Unit, onExitFullscreen: () -> Unit = onFullscreen) {
     var visible by remember { mutableStateOf(!tv) }
     val transportFocus = remember { FocusRequester() }
     LaunchedEffect(controlsSignal) {
@@ -186,6 +207,11 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
     LaunchedEffect(visible, interaction, menu, state.paused, state.playback?.revision) {
         if (visible && !menu && !state.paused && state.playback != null) { delay(5000); visible = false }
     }
+    BackHandler(enabled = tv && fullscreen && (menu || visible)) {
+        if (page != null) page = null else if (menu) menu = false
+        else if (visible) visible = false
+        else onExitFullscreen() // A second fast Back must not be swallowed before handler recomposition.
+    }
     val silent = state.muted
     fun interact(action: () -> Unit) { interaction++; visible = true; action() }
     val swipeEnabled = fullscreen && !pictureInPicture && !menu && !tv
@@ -205,7 +231,7 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
             },
         )
     } else Modifier
-    Box(modifier.background(Color.Black).then(swipeModifier).clickable { visible = !visible }) {
+    Box(modifier.background(Color.Black).then(swipeModifier).then(if (tv) Modifier else Modifier.clickable { visible = !visible })) {
         state.playback?.let { playback ->
             NativeVideo(playback, model, Modifier.fillMaxSize(), state.paused,
                 if (state.muted) 0f else 1f, onPosition = { sourceTime = it }, onTap = { visible = !visible })
@@ -229,8 +255,13 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
             // Match the web touch layout: gradient and shared station/program metadata above the transport row.
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().onPreviewKeyEvent { event ->
                 // Remote navigation extends the overlay timeout while leaving focus to its controls.
-                if (tv && event.type == KeyEventType.KeyDown) interaction++
-                false
+                if (tv && fullscreen && event.key == Key.Back) {
+                    if (event.type == KeyEventType.KeyUp) visible = false
+                    true
+                } else {
+                    if (tv && event.type == KeyEventType.KeyDown) interaction++
+                    false
+                }
             }.onSizeChanged { controlsHeight = it.height }
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
                 .padding(if (fullscreen) WindowInsets.safeDrawing.asPaddingValues() else PaddingValues(0.dp))
@@ -270,7 +301,7 @@ internal fun PhonePlayer(state: PhoneState, model: PhoneModel, modifier: Modifie
                     WebControl(if (silent) "Unmute" else "Mute", if (silent) "M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.4 2.4-1.4 1.4-2.4-2.4-2.4 2.4-1.4-1.4 2.4-2.4-2.4-2.4 1.4-1.4 2.4 2.4 2.4-2.4 1.4 1.4z" else "M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z") { interact { model.toggleMute(); menu = false } }
                     Box {
                         WebControl("Settings", "M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z") { interact { menu = !menu; page = null } }
-                        PlayerPopup(expanded = menu, onDismiss = { menu = false }) {
+                        PlayerPopup(expanded = menu, onDismiss = { if (page != null) page = null else menu = false }) {
                                 when (page) {
                                     null -> listOf("Quality", "Audio Tracks", "Subtitles").forEach { label ->
                                         PlayerMenuItem(text = { Text(label) }, onClick = { interact { page = label } })

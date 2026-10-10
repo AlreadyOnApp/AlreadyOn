@@ -28,6 +28,7 @@ func TestTVPairingAccountIsolationAndLocalBoundary(t *testing.T) {
 	handler := auth.RequireAuth(db, NewRouter(t.TempDir(), t.TempDir(), db))
 	request := func(pin, peer string, secure bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("POST", "/api/auth/tv-login", strings.NewReader(`{"username":"viewer","pin":"`+pin+`"}`))
+		r.Header.Set("User-Agent", "AlreadyOn-Android/TV")
 		r.RemoteAddr = peer
 		r.Header.Set("X-Forwarded-For", "192.168.1.2")
 		if strings.HasPrefix(peer, "192.168.") {
@@ -70,8 +71,22 @@ func TestTVPairingAccountIsolationAndLocalBoundary(t *testing.T) {
 		t.Fatalf("viewer pairing: %d %s", w.Code, w.Body.String())
 	}
 	cookies := w.Result().Cookies()
-	if len(cookies) == 0 || !cookies[0].Secure {
+	if len(cookies) == 0 || !cookies[0].Secure || cookies[0].Expires.Year() != 9999 {
 		t.Fatal("missing secure TV session")
+	}
+	var expiry int64
+	if err := db.QueryRow("SELECT expires_at_unix FROM browser_sessions WHERE user_id=?", viewer.ID).Scan(&expiry); err != nil || expiry != auth.NeverExpiresUnix {
+		t.Fatal("PIN-paired sessions must remain signed in until revoked")
+	}
+	// Status refresh upgrades a saved legacy cookie only while its session is authenticated.
+	statusRequest := httptest.NewRequest("GET", "/api/auth/status", nil)
+	statusRequest.TLS = &tls.ConnectionState{}
+	statusRequest.AddCookie(cookies[0])
+	statusResponse := httptest.NewRecorder()
+	handler.ServeHTTP(statusResponse, statusRequest)
+	refreshed := statusResponse.Result().Cookies()
+	if statusResponse.Code != 200 || len(refreshed) != 1 || refreshed[0].Expires.Year() != 9999 || !refreshed[0].Secure {
+		t.Fatal("native status must refresh its durable secure cookie")
 	}
 	r := httptest.NewRequest("GET", "/api/auth/tv-pin", nil)
 	r.AddCookie(cookies[0])

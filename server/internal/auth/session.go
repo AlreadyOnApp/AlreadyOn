@@ -53,12 +53,22 @@ func hashToken(token string) string {
 // CreateSession starts a browser session for a user and returns its raw
 // token, which is never stored, and the row id.
 func CreateSession(ctx context.Context, db *sql.DB, now time.Time, userID int64, userAgent string) (token string, id int64, expires time.Time, err error) {
+	return createSession(ctx, db, now, userID, userAgent, SessionDays(ctx, db))
+}
+
+// CreateNativeSession persists PIN-paired devices until explicit session revocation.
+// Browser lifetime settings do not silently sign a living-room device out.
+func CreateNativeSession(ctx context.Context, db *sql.DB, now time.Time, userID int64, userAgent string) (string, int64, time.Time, error) {
+	return createSession(ctx, db, now, userID, userAgent, 0)
+}
+
+func createSession(ctx context.Context, db *sql.DB, now time.Time, userID int64, userAgent string, days int) (token string, id int64, expires time.Time, err error) {
 	raw := make([]byte, 32)
 	if _, err = rand.Read(raw); err != nil {
 		return "", 0, time.Time{}, fmt.Errorf("auth: create session: %w", err)
 	}
 	token = base64.RawURLEncoding.EncodeToString(raw)
-	if days := SessionDays(ctx, db); days == 0 {
+	if days == 0 {
 		expires = time.Unix(NeverExpiresUnix, 0)
 	} else {
 		expires = now.Add(time.Duration(days) * 24 * time.Hour)

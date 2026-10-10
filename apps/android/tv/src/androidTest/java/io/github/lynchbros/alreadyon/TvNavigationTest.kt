@@ -93,7 +93,7 @@ class TvNavigationTest {
             compose.waitUntil(10000) { exists("CHANNEL") }
             assertTrue("Compact guide on first entry", exists("CHANNEL"))
             assertTrue("Guide channel 110", exists("110"))
-            compose.waitUntil(10000) { compose.onAllNodes(hasText("Now ·", substring = true) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10000) { compose.onAllNodes(hasContentDescription("Channel 110: TV fixture 110") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Admin").performClick()
             compose.onNodeWithText("Switch Profile").assertExists()
             compose.onNodeWithText("Sign Out").assertExists()
@@ -101,7 +101,7 @@ class TvNavigationTest {
             device.pressBack()
             val model = ViewModelProvider(compose.activity)[PhoneModel::class.java]
             compose.runOnIdle { model.setQuality(720); model.setSubtitle(null) }
-            val muted = model.state.value.muted
+            val muted = false
             click("110")
             assertTrue("Fullscreen hides guide", !exists("CHANNEL"))
             compose.waitUntil(60000) { !exists("Preparing channel…") }
@@ -109,9 +109,13 @@ class TvNavigationTest {
             device.pressDPadDown()
             compose.waitUntil(10000) { compose.onAllNodes(hasContentDescription("Mute") or hasContentDescription("Unmute")).fetchSemanticsNodes().isNotEmpty() }
             device.pressDPadRight()
-            compose.waitUntil(60000) { exists("111") }
+            compose.waitForIdle()
+            compose.runOnIdle { assertEquals("Overlay navigation must not tune", 110, model.state.value.channel?.number) }
+            device.pressBack() // Hide controls before channel navigation.
+            device.pressDPadRight()
+            compose.waitUntil(60000) { model.state.value.channel?.number == 111 && model.state.value.playback != null }
             device.pressDPadLeft()
-            compose.waitUntil(60000) { exists("110") }
+            compose.waitUntil(60000) { model.state.value.channel?.number == 110 && model.state.value.playback != null }
             compose.runOnIdle {
                 assertEquals("Quality survives tuning", 720, model.state.value.quality)
                 assertEquals("Mute survives tuning", muted, model.state.value.muted)

@@ -486,3 +486,30 @@ func TestLastEnabledOwnerIsAlwaysKept(t *testing.T) {
 		t.Fatalf("demote with only a disabled owner left: err = %v", err)
 	}
 }
+
+// Native persistence still uses the revocation ledger and does not change browser expiry.
+func TestNativeSessionPersistsUntilRevoked(t *testing.T) {
+	db := openAuthDB(t)
+	uid := mustOwner(t, db)
+	now := time.Now()
+	token, id, expires, err := CreateNativeSession(t.Context(), db, now, uid, "native fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expires.Unix() != NeverExpiresUnix {
+		t.Fatal("native session has automatic expiry")
+	}
+	if _, _, err := LookupSession(t.Context(), db, token, now.AddDate(2, 0, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := DeleteSession(t.Context(), db, uid, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := LookupSession(t.Context(), db, token, now); !errors.Is(err, ErrNoSession) {
+		t.Fatal("revoked native session accepted")
+	}
+	_, _, browserExpiry, err := CreateSession(t.Context(), db, now, uid, "browser fixture")
+	if err != nil || !browserExpiry.Equal(now.Add(DefaultSessionDays*24*time.Hour)) {
+		t.Fatal("browser lifetime changed")
+	}
+}

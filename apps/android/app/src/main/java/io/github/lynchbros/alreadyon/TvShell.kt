@@ -37,7 +37,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(state.profile == null) { if (state.profile == null) fullscreen = false }
-    LaunchedEffect(fullscreen) { if (fullscreen) focus.requestFocus() }
+    LaunchedEffect(fullscreen, controlsVisible) { if (fullscreen && !controlsVisible) focus.requestFocus() }
     LaunchedEffect(state.profile?.id) {
         while (state.profile != null) { delay(30_000); model.refreshGuide() }
     }
@@ -55,17 +55,29 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
             .onPreviewKeyEvent { event ->
                 if (!fullscreen) return@onPreviewKeyEvent false
                 when (event.key) {
+                    Key.Back -> {
+                        if (controlsVisible) false else {
+                            if (event.type == KeyEventType.KeyUp) { fullscreen = false; manager.clearFocus() }
+                            true
+                        }
+                    }
                     Key.DirectionLeft, Key.DirectionRight -> {
-                        if (controlsVisible) return@onPreviewKeyEvent false
+                        if (controlsVisible || state.playback == null) return@onPreviewKeyEvent false
                         if (event.type == KeyEventType.KeyUp) model.stepChannel(if (event.key == Key.DirectionRight) 1 else -1)
                         true
                     }
                     Key.DirectionUp, Key.DirectionDown -> {
                         if (event.type == KeyEventType.KeyDown) {
-                            if (!controlsVisible) controlsSignal++
+                            if (!controlsVisible) { controlsVisible = true; controlsSignal++ }
                             else manager.moveFocus(if (event.key == Key.DirectionDown) FocusDirection.Next else FocusDirection.Previous)
                         }
                         true
+                    }
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        if (controlsVisible) false else {
+                            if (event.type == KeyEventType.KeyDown) { controlsVisible = true; controlsSignal++ }
+                            true
+                        }
                     }
                     else -> false
                 }
@@ -96,7 +108,8 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                             PhonePlayer(state, model,
                                 if (fullscreen) Modifier.fillMaxSize() else Modifier.width(320.dp).fillMaxHeight(),
                                 fullscreen = fullscreen, tv = true, controlsSignal = controlsSignal,
-                                onControlsVisibility = { controlsVisible = it }, onFullscreen = { if (!fullscreen) model.unmute(); fullscreen = !fullscreen })
+                                onControlsVisibility = { controlsVisible = it }, onFullscreen = { if (!fullscreen) model.unmute(); fullscreen = !fullscreen },
+                                onExitFullscreen = { fullscreen = false })
                             if (!fullscreen) Column(Modifier.weight(1f).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("${state.channel.number} · ${state.channel.name}", style = MaterialTheme.typography.titleLarge)
                                 state.playback?.let { playback ->
@@ -107,7 +120,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                             }
                         }
                     }
-                    if (!fullscreen) ChannelGuide(state, model, palette, Modifier.weight(1f)) { channel ->
+                    if (!fullscreen) TvGuide(state, palette, Modifier.weight(1f)) { channel ->
                         model.unmute(); model.watch(channel); fullscreen = true
                     }
                 }

@@ -29,3 +29,5 @@ Swagger uses a short overview; operation-level role declarations remain in OpenA
 Channel filters accept `excludedGenres` (exclusions win) and `requireKnownYear`. These optional fields default to no exclusions and allowing unknown years. Restricted built-in defaults enable known-year filtering.
 
 Native account PIN sign-in now requires both `username` and `pin` in `POST /api/auth/tv-login`. A PIN supplied with another account’s username is rejected. Phone/tablet and TV use this shared LAN-only flow after discovery or a 30-second manual-address fallback.
+
+Native PIN sign-in now issues a persistent, revocable session; browser expiry settings still apply to browser sign-in. Valid native sessions migrate to persistence; expired/revoked sessions are never restored. Auth status refreshes migrated native cookies.

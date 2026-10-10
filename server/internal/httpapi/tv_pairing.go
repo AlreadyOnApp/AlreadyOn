@@ -109,6 +109,6 @@ func handleTVLogin(db *sql.DB, limiter *auth.Limiter, cookieName string) http.Ha
 			return
 		}
 		limiter.Succeed(client)
-		signIn(w, r, db, cookieName, http.StatusOK, user)
+		signInSession(w, r, db, cookieName, http.StatusOK, user, true)
 	}
 }

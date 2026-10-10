@@ -19,3 +19,5 @@ Check sign-in, profile selection/PIN behavior, channel changes, transitions, tra
 See [emulator setup](ANDROID_EMULATOR.md), [playback](PLAYBACK.md) and [API compatibility](../api/COMPATIBILITY.md).
 
 The [Google TV target](GOOGLE_TV.md) shares this client infrastructure, with fixed TV presentation, remote navigation and local account PIN pairing.
+
+See [physical TV review](TV_DEVICE_REVIEW.md) for safe remote-driven checks and release performance measurement.

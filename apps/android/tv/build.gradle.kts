@@ -19,7 +19,19 @@ android {
     }
     buildTypes {
         debug { applicationIdSuffix = ".tv.debug" }
-        release { isMinifyEnabled = false }
+        release {
+            // Ship the same optimization measured on physical TVs with limited CPU and memory.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
+        // Same debug identity/key preserves device sessions while measuring optimized, non-debuggable code.
+        create("deviceReview") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".tv.debug"
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
+        }
     }
     // Shared model, playback controls, guide and brand; TV owns its shell and launcher.
     sourceSets["main"].java.srcDir("../app/src/main/java")

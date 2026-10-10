@@ -65,22 +65,50 @@ func statusFor(r *http.Request, db *sql.DB) (authStatusResponse, error) {
 
 // signIn starts a session for the request and answers with the new status.
 func signIn(w http.ResponseWriter, r *http.Request, db *sql.DB, cookieName string, code int, u auth.User) {
-	token, id, expires, err := auth.CreateSession(r.Context(), db, time.Now(), u.ID, r.UserAgent())
+	signInSession(w, r, db, cookieName, code, u, false)
+}
+
+// Native PIN pairing uses the same revocable session ledger with no automatic expiry.
+func signInSession(w http.ResponseWriter, r *http.Request, db *sql.DB, cookieName string, code int, u auth.User, native bool) {
+	create := auth.CreateSession
+	if native {
+		create = auth.CreateNativeSession
+	}
+	token, id, expires, err := create(r.Context(), db, time.Now(), u.ID, r.UserAgent())
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not start a session")
 		return
 	}
-	setSessionCookie(w, r, cookieName, token, expires)
+	if native {
+		setNativeSessionCookie(w, r, cookieName, token)
+	} else {
+		setSessionCookie(w, r, cookieName, token, expires)
+	}
 	logging.Info("signed in: %s (%s) session %d started, valid until %s", u.Username, u.Role, id, expires.Format(time.RFC3339))
 	writeJSON(w, code, statusOf(u))
 }
 
-func handleAuthStatus(db *sql.DB) http.HandlerFunc {
+// Native stores honor a durable expiry directly; session revocation remains authoritative.
+func setNativeSessionCookie(w http.ResponseWriter, r *http.Request, name, token string) {
+	http.SetCookie(w, &http.Cookie{Name: name, Value: token, Path: "/", Expires: time.Unix(auth.NeverExpiresUnix, 0), HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteLaxMode})
+}
+
+func handleAuthStatus(db *sql.DB, cookieName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp, err := statusFor(r, db)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "internal error")
 			return
+		}
+		// Refresh legacy native cookies only after middleware authenticates the migrated session.
+		if principal := auth.PrincipalID(r.Context()); r.TLS != nil && resp.Authenticated && principal < 0 {
+			var expiry int64
+			var agent string
+			if db.QueryRowContext(r.Context(), "SELECT expires_at_unix,user_agent FROM browser_sessions WHERE id=?", -principal).Scan(&expiry, &agent) == nil && expiry == auth.NeverExpiresUnix && (agent == "AlreadyOn-Android/TV" || agent == "AlreadyOn-Android/Mobile") {
+				if cookie, err := r.Cookie(cookieName); err == nil {
+					setNativeSessionCookie(w, r, cookieName, cookie.Value)
+				}
+			}
 		}
 		writeJSON(w, http.StatusOK, resp)
 	}

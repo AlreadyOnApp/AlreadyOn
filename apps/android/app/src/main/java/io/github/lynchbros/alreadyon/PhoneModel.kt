@@ -22,7 +22,7 @@ import java.io.IOException
 import java.time.Instant
 
 /** Authorized media metadata is ephemeral and never saved in Android instance state. */
-internal data class PhonePlayback(val url: String, val title: String, val startMs: Long, val revision: Long, val hlsTargetMs: Long? = null, val capturedAt: Long = SystemClock.elapsedRealtime(),
+internal data class PhonePlayback(val url: String, val title: String, val startMs: Long, val revision: Long, val hlsTargetMs: Long? = null, val capturedAt: Long = SystemClock.elapsedRealtime(), val requestedAt: Long = capturedAt,
     val seriesTitle: String = "", val episodeLabel: String = "", val mediaFileId: Long = -1, val sourceHeight: Int = 720,
     val audioTracks: List<PhoneTrack> = emptyList(), val subtitleTracks: List<PhoneTrack> = emptyList(),
     val streamOffsetSeconds: Double = 0.0, val hlsOriginMs: Long? = null, val bypassTls: Boolean = false, val trustedCa: String? = null)
@@ -243,15 +243,15 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         preferredSubtitle = null
         update { it.copy(muted = true, paused = false, audioIndex = null, audioFileId = null, subtitleIndex = null, subtitleFileId = null) }
         (channels.find { it.id == profile.lastChannel && it.programs.isNotEmpty() }
-            ?: channels.firstOrNull { it.programs.isNotEmpty() })?.let(::watch)
+            ?: channels.firstOrNull { it.programs.isNotEmpty() })?.let { watch(it, restart = true) }
     }
     fun setQuality(height: Int) {
         update { it.copy(quality = height) }
-        state.value.channel?.let(::watch)
+        state.value.channel?.let { watch(it, restart = true) }
     }
     fun setAudio(track: PhoneTrack) {
         update { it.copy(audioIndex = track.index, audioFileId = it.playback?.mediaFileId) }
-        state.value.channel?.let(::watch)
+        state.value.channel?.let { watch(it, restart = true) }
     }
     fun setSubtitle(index: Int?) {
         subtitleOverride = true
@@ -265,7 +265,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         val available = state.value.channels.filter { it.programs.isNotEmpty() }
         val next = if (direction > 0) available.filter { it.number > current.number }.minByOrNull { it.number }
             else available.filter { it.number < current.number }.maxByOrNull { it.number }
-        next?.let(::watch)
+        next?.let { watch(it, restart = true) }
     }
 
     private fun selectedSubtitle(media: PhonePlayback, profile: ViewerProfile): Int? {
@@ -303,10 +303,13 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun watch(channel: GuideChannel) {
+    fun watch(channel: GuideChannel, restart: Boolean = false) {
+        // Opening an already playing channel must not tear down its lease and buffer again.
+        if (!restart && state.value.channel?.id == channel.id && state.value.playback != null) return
         val api = client ?: return
         val profile = state.value.profile ?: return
         if (state.value.mustChangePassword || state.value.settings != null) return
+        val requestedAt = SystemClock.elapsedRealtime()
         val previous = viewing
         previous?.cancel()
         update { it.copy(channel = channel, playback = null, error = null) }
@@ -331,9 +334,10 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
                         val started = SystemClock.elapsedRealtime()
                         while (!tune.getBoolean("ready")) {
                             if (SystemClock.elapsedRealtime() - started > 90_000) throw IOException("Playback did not become ready. Try again.")
-                            delay(1000)
+                            delay(if (BuildConfig.IS_TV) 200 else 1000)
                             tune = status(api, channel.id, token)
                         }
+                        if (android.util.Log.isLoggable("AlreadyOnPlayback", android.util.Log.DEBUG)) android.util.Log.d("AlreadyOnPlayback", "Tune ready preparationMs=${SystemClock.elapsedRealtime()-requestedAt} mode=${tune.getJSONObject("plan").getString("mode")}")
                         val now = Instant.parse(tune.getString("serverTime"))
                         val end = Instant.parse(tune.getString("entryEndsAt"))
                         val delaySeconds = tune.optDouble("presentationDelaySeconds", 3.0)
@@ -348,6 +352,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
                             (offset.coerceAtLeast(0.0) * 1000).toLong(), ++serial,
                             if (direct || tune.optString("hlsOrigin").isBlank()) null else
                                 Instant.parse(tune.getString("hlsOrigin")).toEpochMilli() + (offset * 1000).toLong(),
+                            requestedAt = requestedAt,
                             seriesTitle = tune.optJSONObject("program")?.takeIf { it.optString("mediaType") == "episode" }?.optString("seriesTitle").orEmpty(),
                             episodeLabel = tune.optJSONObject("program")?.takeIf { it.optString("mediaType") == "episode" && it.has("episodeNumber") }?.let {
                                 "S${it.optInt("seasonNumber").toString().padStart(2, '0')}E${it.optInt("episodeNumber").toString().padStart(2, '0')} - "
@@ -399,7 +404,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         val resume = state.value.paused
         update { it.copy(paused = !it.paused) }
         // Resume rejoins the server's current schedule rather than playing behind live time.
-        if (resume) state.value.channel?.let(::watch)
+        if (resume) state.value.channel?.let { watch(it, restart = true) }
     }
     // Physical phone buttons control output volume; the player controls only mute.
     // Deliberate fullscreen entry starts audible playback without toggling an already audible stream.
