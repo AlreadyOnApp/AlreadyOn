@@ -8,8 +8,10 @@ Guide arrows update the details beside the preview using the selected program’
 
 In the guide, Back first restores the previewed channel and current program if selection has moved. When already there, Back focuses Play/Pause in the mini-player. Left/Right navigates its controls; Up opens the profile menu with **Switch Profile** focused and Down restores the current channel/program in the guide. Back from the open profile menu returns to Play/Pause in the mini-player. Back from the mini-player or profile button exits to the TV home screen without signing out. An open popup handles Back before its underlying screen.
 
-After the first profile selection or restoration, a static remote tutorial appears once per installation. **Got it** or Back dismisses it and opens the guide. The local acknowledgement survives restarts, updates and sign-out. Uninstalling resets it. No player or guide is mounted during the tutorial; it has no animations, image assets or timers.
+After the first profile selection or restoration, a static remote tutorial appears once per installation. **Got it** or Back dismisses it and opens the guide. The acknowledgement survives updates and sign-out; uninstalling resets it. No player or guide is mounted during the tutorial; it has no animations, image assets or timers.
 
 The optimized review APK is labeled **AlreadyOn TV Test**. Updating this package preserves its encrypted session; uninstalling removes it. See [device review](TV_DEVICE_REVIEW.md) for the physical remote checks.
 
 Routine background loading has no animated status bar on TV; refreshes keep the layout steady. Errors still appear when an operation fails.
+
+TV and phone startup show the centered logo and tagline for two seconds while loading underneath; rotation retains the deadline. The TV guide removes branding, reserves profile-menu space and fits four rows without smaller fonts. Up/Down use identical short transitions to reveal clipped rows.

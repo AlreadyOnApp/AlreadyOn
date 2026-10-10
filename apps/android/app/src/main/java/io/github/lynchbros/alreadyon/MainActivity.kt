@@ -82,97 +82,99 @@ class MainActivity : ComponentActivity() {
         setContent {
             val model: PhoneModel = viewModel()
             val state by model.state.collectAsStateWithLifecycle()
-            if (BuildConfig.IS_TV) {
-                TvShell(state, model)
-                return@setContent
-            }
-            val owner = LocalLifecycleOwner.current
-            var fullscreen by rememberSaveable { mutableStateOf(false) }
-            val orientation = LocalConfiguration.current.orientation
-            LaunchedEffect(orientation) {
-                if (state.channel != null) {
-                    fullscreen = orientation == Configuration.ORIENTATION_LANDSCAPE
+            StartupPreload {
+                if (BuildConfig.IS_TV) {
+                    TvShell(state, model)
+                    return@StartupPreload
                 }
-            }
-            // Rotation/fullscreen/PiP change presentation only; lifecycle resume handles a released lease.
-            LaunchedEffect(state.channel == null) { if (state.channel == null) fullscreen = false }
-            DisposableEffect(owner, model) {
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_STOP -> model.suspendWatching()
-                        Lifecycle.Event.ON_START -> model.resumeWatching()
-                        else -> Unit
+                val owner = LocalLifecycleOwner.current
+                var fullscreen by rememberSaveable { mutableStateOf(false) }
+                val orientation = LocalConfiguration.current.orientation
+                LaunchedEffect(orientation) {
+                    if (state.channel != null) {
+                        fullscreen = orientation == Configuration.ORIENTATION_LANDSCAPE
                     }
                 }
-                owner.lifecycle.addObserver(observer)
-                onDispose { owner.lifecycle.removeObserver(observer) }
-            }
-            LaunchedEffect(state.playback != null, state.paused) {
-                pipEligible = state.playback != null && !state.paused
-                if (pipSupported && Build.VERSION.SDK_INT >= 31) setPictureInPictureParams(PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(16, 9)).setAutoEnterEnabled(pipEligible).build())
-            }
-            val expanded = fullscreen || pip
-            val view = LocalView.current
-            DisposableEffect(fullscreen, view) {
-                val controller = WindowCompat.getInsetsController(window, view)
-                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                if (fullscreen) controller.hide(WindowInsetsCompat.Type.systemBars())
-                else controller.show(WindowInsetsCompat.Type.systemBars())
-                onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
-            }
-            BackHandler(enabled = fullscreen || state.settings != null || state.channel != null || state.profile != null) {
-                when {
-                    state.settings != null -> model.closeSettings()
-                    fullscreen -> fullscreen = false
-                    state.channel != null -> model.changeProfile()
-                    else -> model.changeProfile()
+                // Rotation/fullscreen/PiP change presentation only; lifecycle resume handles a released lease.
+                LaunchedEffect(state.channel == null) { if (state.channel == null) fullscreen = false }
+                DisposableEffect(owner, model) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_STOP -> model.suspendWatching()
+                            Lifecycle.Event.ON_START -> model.resumeWatching()
+                            else -> Unit
+                        }
+                    }
+                    owner.lifecycle.addObserver(observer)
+                    onDispose { owner.lifecycle.removeObserver(observer) }
                 }
-            }
-            LaunchedEffect(state.profile?.id) {
-                while (state.profile != null) { delay(30_000); model.refreshGuide() }
-            }
-            PhoneTheme {
-                val palette = phonePalette
-                val choosingProfile = state.signedIn && !state.mustChangePassword && state.profile == null
-                Scaffold(contentWindowInsets = if (expanded) WindowInsets(0, 0, 0, 0) else WindowInsets.safeDrawing) { insets ->
-                    Column(Modifier.fillMaxSize().padding(insets).padding(if (expanded) 0.dp else 8.dp),
-                        verticalArrangement = if (choosingProfile) Arrangement.spacedBy(24.dp, Alignment.CenterVertically) else Arrangement.spacedBy(if (expanded) 0.dp else 4.dp)) {
-                        // Center the chooser as one group, keeping generous gaps between profile rows.
-                        if (!expanded) Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = palette.surface, shape = MaterialTheme.shapes.medium) {
-                            if (state.profile != null) Row(Modifier.fillMaxWidth().padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                PhoneBrand()
-                                ProfileMenu(state, model)
-                            } else Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                PhoneBrand()
-                                if (choosingProfile) Text("Who’s Watching?", style = MaterialTheme.typography.headlineMedium)
-                            }
-                        }
-                        if (!expanded) {
-                            state.error?.let { message ->
-                                Text(message, color = MaterialTheme.colorScheme.error)
-                                TextButton(onClick = model::dismissError) { Text("Dismiss") }
-                            }
-                            if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                        }
-                        when {
-                            !state.signedIn -> ServerConnectScreen(state, model, Modifier.weight(1f))
-                            state.mustChangePassword -> AccountScreen(state, model, forced = true)
-                            state.settings == "account" -> AccountScreen(state, model)
-                            state.settings == "profile" -> ProfileSettingsScreen(state, model)
-                            state.profile == null -> ProfileScreen(state, model)
-                            else -> {
-                                if (state.channel != null) {
-                                    // Keep the player at the same Compose call site; fullscreen changes bounds, not its identity.
-                                    val playerModifier = if (expanded) Modifier.fillMaxWidth().weight(1f)
-                                        else Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                                    PhonePlayer(state, model, playerModifier, expanded, pictureInPicture = pip,
-                                        onFullscreen = { fullscreen = !fullscreen })
+                LaunchedEffect(state.playback != null, state.paused) {
+                    pipEligible = state.playback != null && !state.paused
+                    if (pipSupported && Build.VERSION.SDK_INT >= 31) setPictureInPictureParams(PictureInPictureParams.Builder()
+                        .setAspectRatio(Rational(16, 9)).setAutoEnterEnabled(pipEligible).build())
+                }
+                val expanded = fullscreen || pip
+                val view = LocalView.current
+                DisposableEffect(fullscreen, view) {
+                    val controller = WindowCompat.getInsetsController(window, view)
+                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    if (fullscreen) controller.hide(WindowInsetsCompat.Type.systemBars())
+                    else controller.show(WindowInsetsCompat.Type.systemBars())
+                    onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
+                }
+                BackHandler(enabled = fullscreen || state.settings != null || state.channel != null || state.profile != null) {
+                    when {
+                        state.settings != null -> model.closeSettings()
+                        fullscreen -> fullscreen = false
+                        state.channel != null -> model.changeProfile()
+                        else -> model.changeProfile()
+                    }
+                }
+                LaunchedEffect(state.profile?.id) {
+                    while (state.profile != null) { delay(30_000); model.refreshGuide() }
+                }
+                PhoneTheme {
+                    val palette = phonePalette
+                    val choosingProfile = state.signedIn && !state.mustChangePassword && state.profile == null
+                    Scaffold(contentWindowInsets = if (expanded) WindowInsets(0, 0, 0, 0) else WindowInsets.safeDrawing) { insets ->
+                        Column(Modifier.fillMaxSize().padding(insets).padding(if (expanded) 0.dp else 8.dp),
+                            verticalArrangement = if (choosingProfile) Arrangement.spacedBy(24.dp, Alignment.CenterVertically) else Arrangement.spacedBy(if (expanded) 0.dp else 4.dp)) {
+                            // Center the chooser as one group, keeping generous gaps between profile rows.
+                            if (!expanded) Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = palette.surface, shape = MaterialTheme.shapes.medium) {
+                                if (state.profile != null) Row(Modifier.fillMaxWidth().padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    PhoneBrand()
+                                    ProfileMenu(state, model)
+                                } else Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    PhoneBrand()
+                                    if (choosingProfile) Text("Who’s Watching?", style = MaterialTheme.typography.headlineMedium)
                                 }
-                                if (!expanded) ChannelGuide(state, model, palette, Modifier.weight(1f))
+                            }
+                            if (!expanded) {
+                                state.error?.let { message ->
+                                    Text(message, color = MaterialTheme.colorScheme.error)
+                                    TextButton(onClick = model::dismissError) { Text("Dismiss") }
+                                }
+                                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                            }
+                            when {
+                                !state.signedIn -> ServerConnectScreen(state, model, Modifier.weight(1f))
+                                state.mustChangePassword -> AccountScreen(state, model, forced = true)
+                                state.settings == "account" -> AccountScreen(state, model)
+                                state.settings == "profile" -> ProfileSettingsScreen(state, model)
+                                state.profile == null -> ProfileScreen(state, model)
+                                else -> {
+                                    if (state.channel != null) {
+                                        // Keep the player at the same Compose call site; fullscreen changes bounds, not its identity.
+                                        val playerModifier = if (expanded) Modifier.fillMaxWidth().weight(1f)
+                                            else Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                                        PhonePlayer(state, model, playerModifier, expanded, pictureInPicture = pip,
+                                            onFullscreen = { fullscreen = !fullscreen })
+                                    }
+                                    if (!expanded) ChannelGuide(state, model, palette, Modifier.weight(1f))
+                                }
                             }
                         }
                     }
