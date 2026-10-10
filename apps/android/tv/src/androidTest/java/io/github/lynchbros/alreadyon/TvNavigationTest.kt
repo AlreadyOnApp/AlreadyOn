@@ -65,7 +65,10 @@ class TvNavigationTest {
             fun exists(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
             fun click(text: String) {
                 compose.waitUntil(60000) { exists(text) }
-                compose.onAllNodesWithText(text).onFirst().performScrollTo().performClick()
+                val node = compose.onAllNodesWithText(text).onFirst()
+                // The centered keypad fits in its dialog and has no scroll container.
+                if (!exists("✓ Done")) node.performScrollTo()
+                node.performClick()
             }
             if (manual) {
                 assertFalse("No manual address before search timeout", exists("HTTPS server address"))
@@ -90,9 +93,12 @@ class TvNavigationTest {
             compose.waitUntil(60000) { exists("Username") }
             assertFalse("Server fingerprint confirmation is skipped", exists("Confirm Server"))
             compose.onNode(hasSetTextAction() and hasText("Username")).performTextInput("tv-fixture")
-            device.pressBack() // Dismiss the keyboard before using the PIN keypad.
+            compose.onNode(hasSetTextAction() and hasText("Username")).performImeAction()
+            compose.waitUntil(10000) { exists("✓ Done") }
             // Synthetic account PIN set by the isolated test fixture, never a live account.
             "123456".forEach { click(it.toString()) }
+            click("✓ Done")
+            compose.waitUntil(10000) { !exists("✓ Done") }
             click("Connect")
             click("Admin")
             assertTrue("Compact guide on first entry", exists("CHANNEL"))
