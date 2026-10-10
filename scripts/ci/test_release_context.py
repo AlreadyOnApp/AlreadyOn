@@ -79,6 +79,16 @@ class ReleaseContextTests(unittest.TestCase):
         payload = json.loads(command.call_args.kwargs["input"])
         self.assertEqual(payload, {"ref": "refs/tags/2026-10-10", "sha": sha})
 
+    def test_source_tag_advances_only_without_force(self):
+        old, new = "a" * 40, "b" * 40
+        responses = [None, None, old]
+        results = [subprocess.CompletedProcess(["git"], 0), subprocess.CompletedProcess(["gh"], 0)]
+        with patch.object(release_context, "remote_ref", side_effect=responses), \
+                patch.object(release_context.subprocess, "run", side_effect=results) as command:
+            release_context.update_source_tag("owner/repo", "2026-10-10", new)
+        payload = json.loads(command.call_args.kwargs["input"])
+        self.assertEqual(payload, {"sha": new, "force": False})
+
     def test_source_tag_update_requires_ancestor_and_no_stable(self):
         with patch.object(release_context, "remote_ref", side_effect=[None, None, "b" * 40]), \
                 patch.object(release_context.subprocess, "run",

@@ -1,4 +1,4 @@
-name: Publish Android Release
+name: Android Alpha, RC and Stable
 on:
   push:
     branches: [test, main]
@@ -19,10 +19,10 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Build an alpha/draft RC or promote exact tested APK artifacts
+        description: Promote exact tested APK artifacts
         type: choice
-        options: [candidate, promote-test, stable]
-        default: candidate
+        options: [promote-test, stable]
+        default: promote-test
         required: true
       release_date:
         description: Optional YYYY-MM-DD release date; otherwise derive from source/tag
@@ -40,7 +40,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   candidate:
-    if: (github.event_name == 'workflow_call' && inputs.operation == 'candidate') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev' && inputs.operation == 'candidate')
+    if: inputs.operation == 'candidate' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -132,7 +132,7 @@ jobs:
         run: |
           python3 scripts/ci/android-release.py candidate --sha "$SOURCE_SHA" \
             --tag "$VERSION_NAME" --version-code "$VERSION_CODE" --directory "$RUNNER_TEMP/android-assets"
-      - name: Summarize candidate
+      - name: Summarize alpha or draft RC
         env:
           CANDIDATE_TAG: ${{ steps.version.outputs.tag }}
           RELEASE_STAGE: ${{ steps.version.outputs.stage }}

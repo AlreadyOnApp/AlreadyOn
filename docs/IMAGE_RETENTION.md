@@ -8,7 +8,7 @@ Registry tags identify approved image digests; they are separate from GitHub rel
 - `latest`: an approved test promotion.
 - `stable`: an approved main promotion.
 
-Every merged date PR builds and validates a fresh dev image, publishing `nightly` and `YYYY-MM-DD`. Test/main fast-forward promotions retag the same recorded digest as `latest`/`stable`; they do not rebuild. See [release policy](ANDROID_RELEASES.md).
+Every merged date PR builds and validates a fresh dev image, publishing `nightly` and `YYYY-MM-DD`. Test/main promotions merge the tested tree and retag the same recorded digest as `latest`/`stable`; they do not rebuild. See [release policy](ANDROID_RELEASES.md).
 
 Promotion reuses the tested image; it does not rebuild source under a new tag. Record the source commit and immutable digest before publishing. Mutable tags alone are insufficient to identify a deployed artifact.
 

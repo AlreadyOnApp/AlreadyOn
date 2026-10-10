@@ -32,9 +32,9 @@ Before image builds, `scripts/local-bases.py` checks base recipes, parent and ag
 
 On approval, deploy the exact tested image and verify revision, health, service count, mounts and relevant playback. `scripts/deploy-production.sh <ssh-host> [compose-directory]` transfers it with the updater paused. Preserve live data.
 
-After alpha approval run `python3 scripts/promote.py test YYYY-MM-DD`; after RC approval run `python3 scripts/promote.py main`. These are guarded fast-forwards requiring image/APK provenance; they retag/reuse artifacts without e2e reruns. Stop on divergence or branch-protection rejection.
+After alpha approval run `python3 scripts/promote.py test YYYY-MM-DD`; after RC approval run `python3 scripts/promote.py main`. These create fast-forward or exact-tree merge commits only, require image/APK provenance, and reuse artifacts without e2e reruns. Conflicts must be resolved on dev; never bypass branch protection.
 
-Dev image builds run after validated date PR merges. Test/main image promotions run after the guarded fast-forward. See [retention](IMAGE_RETENTION.md) and [deployment](../deploy/README.md).
+Dev image builds run after validated date PR merges. Test/main image promotions run after the guarded source merge. See [retention](IMAGE_RETENTION.md) and [deployment](../deploy/README.md).
 
 ## Public automation
 

@@ -25,8 +25,34 @@ def ancestor(older, newer):
 def validate_fast_forward(target_head, selected, upstream, target):
     if not ancestor(selected, upstream):
         raise ValueError(f'Selected commit is not in current {upstream} history')
-    if not ancestor(target_head, selected):
-        raise ValueError(f'{target} cannot fast-forward to selected commit; resolve the branch divergence on dev')
+    if not ancestor(selected, target_head) and not ancestor(target_head, selected):
+        raise ValueError(f'{target} and selected release have diverged; reconcile the release on dev')
+
+
+def promotion_commit(target, target_head, selected, original_branch):
+    """Fast-forward or create an exact-tree merge commit, restoring the caller's branch."""
+    if run('git', 'status', '--porcelain'):
+        raise ValueError('Working tree must be clean before branch promotion')
+    if ancestor(target_head, selected):
+        return selected
+    result = None
+    switched = False
+    try:
+        subprocess.run(['git', 'switch', '--detach', target_head], check=True)
+        switched = True
+        subprocess.run(['git', 'merge', '--no-ff', '--no-edit', selected], check=True)
+        result = run('git', 'rev-parse', 'HEAD')
+        if run('git', 'rev-parse', f'{result}^{{tree}}') != run('git', 'rev-parse', f'{selected}^{{tree}}'):
+            raise ValueError('Promotion merge changed the tested source tree; resolve changes on dev first')
+        return result
+    except Exception:
+        if switched and subprocess.run(['git', 'rev-parse', '--verify', 'MERGE_HEAD'],
+                                       capture_output=True, check=False).returncode == 0:
+            subprocess.run(['git', 'merge', '--abort'], check=False)
+        raise
+    finally:
+        if switched:
+            subprocess.run(['git', 'switch', original_branch], check=True)
 
 
 def load(name):
@@ -104,8 +130,10 @@ def main():
             release.verify_assets(assets, selected)
     else:
         ensure_rc(repo, day, selected)
-    subprocess.run(['git', 'push', 'origin', f'{selected}:refs/heads/{args.target}'], check=True)
-    print(f'Promoted {selected} to {args.target}; the existing tested digest will be retagged')
+    original_branch = run('git', 'branch', '--show-current')
+    promoted = promotion_commit(args.target, target_head, selected, original_branch)
+    subprocess.run(['git', 'push', 'origin', f'{promoted}:refs/heads/{args.target}'], check=True)
+    print(f'Promoted tested source {selected} to {args.target} as {promoted}; the existing digest will be retagged')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 # Run source tests in the prebuilt CI base; test results are never cached.
 name: Test application source
-description: Run Go and Chromium suites against the selected CI base image
+description: Run Go and full Chromium e2e suites against the selected CI base image
 inputs:
   ci-base:
     description: Immutable CI base image reference

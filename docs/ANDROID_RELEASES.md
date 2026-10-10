@@ -9,8 +9,8 @@ Use one checkout: `python3 scripts/work.py start build` refreshes local `build` 
 | Promotion | Release tag | Publication |
 | --- | --- | --- |
 | Merged date PR into `dev` | `YYYY-MM-DD-alphaN` | Fresh signed APKs and image tagged `nightly` plus `YYYY-MM-DD` |
-| Fast-forward tested date commit from `dev` to `test` | `YYYY-MM-DD-RCN` | Retag image `latest`; publish/copy tested APK bytes |
-| Fast-forward current `test` to `main` | `YYYY-MM-DD-Stable` | Retag image `stable`; publish the latest RC APK bytes |
+| Merge tested date commit from `dev` to `test` | `YYYY-MM-DD-RCN` | Retag image `latest`; publish/copy tested APK bytes |
+| Merge current `test` release into `main` | `YYYY-MM-DD-Stable` | Retag image `stable`; publish the latest RC APK bytes |
 
 Start at alpha1; each dev hotfix increments alpha until RC1. RC1 reuses alpha APK bytes. Later dev hotfixes build a draft for the next RC; test promotion publishes it. RC changelogs include only marked app notes since the prior stage. Stable reuses the latest RC APKs and locks the date.
 
@@ -20,7 +20,7 @@ Each release attaches both APKs, `SHA256SUMS` and `android-release.json`. Promot
 
 ## Automation and gates
 
-Dev PRs run quality, CodeQL and full Go/browser e2e. Dev merges rerun release validation, publish `nightly`/date tags and alpha APKs, then delete the merged date branch. The fast-forward-only commands `python3 scripts/promote.py test YYYY-MM-DD` and `python3 scripts/promote.py main` require tested image/APK provenance and do not rerun e2e. Stop if branch protection rejects a promotion; never bypass it.
+Date PRs run quality, CodeQL and full Go/browser e2e. Dev merge validation publishes the date image and alpha APKs, advances the date tag, then removes the merged date branch. `python3 scripts/promote.py test YYYY-MM-DD` verifies image/alpha APK provenance before merging to test; `python3 scripts/promote.py main` verifies an RC before merging to main. The helpers create exact-tree merge commits when branches have diverged, reuse tested artifacts and skip duplicate e2e. Conflicts stop for resolution on dev. If branch protection rejects a push, stop; never bypass it.
 
 ## Signing and scope
 
