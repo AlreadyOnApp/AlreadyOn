@@ -17,7 +17,7 @@ Documentation checks include the latest commit and pending edits by default. CI 
 1. Static, documentation, syntax and CI policy checks.
 2. Production-image build (`make image`).
 3. Go regressions using patched production FFmpeg (`make test-go-runtime`).
-4. Full synthetic browser suite (`make test-e2e`).
+4. Full synthetic browser suite (`make test-e2e`), waiting for sign-out navigation before checking fresh sign-in.
 5. Disposable packaged-runtime checks (`make test-container`).
 
 Go regressions copy tracked source and non-ignored additions into temporary storage, excluding local databases, credentials and media. Packages run sequentially; multicore accounting checks do not assume minimum throughput from shared runners.
