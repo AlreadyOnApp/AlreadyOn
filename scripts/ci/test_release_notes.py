@@ -51,7 +51,8 @@ class ReleaseNotesTests(unittest.TestCase):
             git('add', '.')
             git('commit', '-qm', 'First feature')
             git('tag', '2026-10-08-stable')
-            (directory / 'second.md').write_text('## Bug fixes\n\n- New fix.\n')
+            (directory / 'second.md').write_text('<!-- android-release -->\n\n## Bug fixes\n\n- New fix.\n')
+            (directory / 'server.md').write_text('## Bug fixes\n\n- Server-only fix.\n')
             git('add', '.')
             git('commit', '-qm', 'New fix')
             sha = git('rev-parse', 'HEAD')
@@ -68,6 +69,7 @@ class ReleaseNotesTests(unittest.TestCase):
                 candidate = changelog_since(sha, baseline)
                 self.assertIn('New fix.', candidate)
                 self.assertNotIn('Old feature.', candidate)
+                self.assertNotIn('Server-only fix.', candidate)
                 self.assertNotIn('Future feature.', candidate)
                 with self.assertRaisesRegex(ValueError, 'ancestor'):
                     changelog_since(baseline, sha)

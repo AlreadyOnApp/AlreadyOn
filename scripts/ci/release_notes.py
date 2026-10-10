@@ -6,6 +6,7 @@ SECTIONS = ('Features', 'Improvements', 'Bug fixes')
 START = '<!-- end-user-changelog:start -->'
 END = '<!-- end-user-changelog:end -->'
 DIRECTORY = 'docs/release-notes/'
+ANDROID_RELEASE_MARKER = '<!-- android-release -->'
 
 
 def git(*args):
@@ -19,6 +20,8 @@ def render_fragments(fragments, empty_message='No new user-facing changes since 
         section = None
         for line in fragment.splitlines():
             if not line.strip():
+                continue
+            if line.strip() == ANDROID_RELEASE_MARKER:
                 continue
             if line.startswith('## ') and line[3:] in groups:
                 section = line[3:]
@@ -63,7 +66,13 @@ def changelog_since(sha, baseline_sha):
         raise subprocess.CalledProcessError(result.returncode, result.args)
     files = git('diff', '--name-only', '--diff-filter=AM', baseline_sha, sha,
                 '--', DIRECTORY).splitlines()
-    fragments = [git('show', f'{sha}:{name}') for name in sorted(files) if name.endswith('.md')]
+    fragments = []
+    for name in sorted(files):
+        if not name.endswith('.md'):
+            continue
+        fragment = git('show', f'{sha}:{name}')
+        if ANDROID_RELEASE_MARKER in fragment.splitlines():
+            fragments.append(fragment)
     return render_fragments(fragments, 'No new user-facing changes since the previous Android release.')
 
 
