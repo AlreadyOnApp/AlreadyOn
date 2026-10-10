@@ -1,66 +1,107 @@
 package io.github.lynchbros.alreadyon
 
 import android.content.Context
-import android.net.nsd.NsdManager
-import android.net.nsd.NsdServiceInfo
-import android.net.wifi.WifiManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import org.json.JSONObject
+import java.io.IOException
 import java.net.InetAddress
-import java.net.URI
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 internal data class TvServer(val name: String, val origin: String)
 
-/** DNS-SD discovers endpoints, never usernames, PINs or automatic trust grants. */
+/** Bounded, credential-free HTTPS probes; closing the scan cancels every socket. */
 internal class TvDiscovery(context: Context, private val found: (TvServer) -> Unit,
-    private val lost: (String) -> Unit, private val failed: (String) -> Unit) {
-    private val manager = context.getSystemService(NsdManager::class.java)
+    private val failed: (String) -> Unit) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val pending = Channel<NsdServiceInfo>(32)
-    private val wifi = context.applicationContext.getSystemService(WifiManager::class.java)
-    private val lock = wifi?.createMulticastLock("alreadyon-tv-discovery")?.apply { setReferenceCounted(false) }
-    private var started = false
-    private val listener = object : NsdManager.DiscoveryListener {
-        override fun onDiscoveryStarted(type: String) = Unit
-        override fun onDiscoveryStopped(type: String) = Unit
-        override fun onStartDiscoveryFailed(type: String, code: Int) { scope.launch { failed("Local discovery could not start. Check the network and rescan.") } }
-        override fun onStopDiscoveryFailed(type: String, code: Int) = Unit
-        override fun onServiceFound(service: NsdServiceInfo) { pending.trySend(service) }
-        override fun onServiceLost(service: NsdServiceInfo) { scope.launch { lost(service.serviceName) } }
-    }
     init {
-        // Legacy NSD resolution allows one outstanding resolve; serialize its queue.
         scope.launch {
-            for (service in pending) {
-                val resolved = resolve(service) ?: continue
-                val address = resolved.host ?: continue
-                if (!privateAddress(address) || resolved.port !in 1..65535) continue
-                val origin = URI("https", null, address.hostAddress, resolved.port, null, null, null).toString()
-                found(TvServer(resolved.serviceName.take(128), origin))
+            val manager = context.getSystemService(ConnectivityManager::class.java)
+            val network = manager.activeNetwork
+            val capabilities = network?.let { manager.getNetworkCapabilities(it) }
+            val links = network?.let { manager.getLinkProperties(it) }
+            val local = links?.linkAddresses?.firstOrNull { it.address.address.size == 4 && it.address.isSiteLocalAddress }
+            if (network == null || local == null || capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) != true) {
+                failed("No local IPv4 network available. Enter the server address after the search ends.")
+                return@launch
+            }
+            // Scan the device's /24 first on larger LANs. Never enumerate more than /16.
+            val candidates = subnetCandidates(local.address.address, local.prefixLength).toList()
+            val baseClient = OkHttpClient.Builder().socketFactory(network.socketFactory)
+                .connectTimeout(750, TimeUnit.MILLISECONDS).readTimeout(750, TimeUnit.MILLISECONDS)
+                .callTimeout(1500, TimeUnit.MILLISECONDS).build()
+            withTimeoutOrNull(30_000) {
+                while (isActive) {
+                    val queue = Channel<String>(64)
+                    launch { candidates.forEach { queue.send(it) }; queue.close() }
+                    coroutineScope {
+                        repeat(32) {
+                            launch(Dispatchers.IO) {
+                                for (address in queue) {
+                                    val origin = "https://$address:19900"
+                                    val base = origin.toHttpUrl()
+                                    val client = baseClient.newBuilder().serverTls(base, true).build()
+                                    val server = try { probeDiscovery(client, origin) }
+                                        finally { client.connectionPool.evictAll() }
+                                    if (server != null && isActive) withContext(Dispatchers.Main.immediate) { found(server) }
+                                }
+                            }
+                        }
+                    }
+                    delay(3000)
+                }
             }
         }
-        try {
-            lock?.acquire()
-            manager.discoverServices("_alreadyon._tcp.", NsdManager.PROTOCOL_DNS_SD, listener)
-            started = true
-        } catch (_: Exception) { failed("Local discovery is unavailable. Check the network and rescan.") }
     }
-    @Suppress("DEPRECATION")
-    private suspend fun resolve(service: NsdServiceInfo): NsdServiceInfo? = suspendCancellableCoroutine { continuation ->
-        try {
-            manager.resolveService(service, object : NsdManager.ResolveListener {
-                override fun onResolveFailed(info: NsdServiceInfo, code: Int) { if (continuation.isActive) continuation.resume(null) }
-                override fun onServiceResolved(info: NsdServiceInfo) { if (continuation.isActive) continuation.resume(info) }
-            })
-        } catch (_: Exception) { if (continuation.isActive) continuation.resume(null) }
-    }
-    fun close() {
-        if (started) runCatching { manager.stopServiceDiscovery(listener) }
-        scope.cancel(); pending.close()
-        if (lock?.isHeld == true) lock.release()
-    }
+    fun close() { scope.cancel() }
+}
+
+/** An open port alone is insufficient: require AlreadyOn's protocol and metadata. */
+internal suspend fun probeDiscovery(client: OkHttpClient, origin: String): TvServer? = suspendCancellableCoroutine { continuation ->
+    val call = client.newCall(Request.Builder().url("$origin/api/tv/server").build())
+    continuation.invokeOnCancellation { call.cancel() }
+    call.enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) { if (continuation.isActive) continuation.resume(null) }
+        override fun onResponse(call: Call, response: Response) {
+            val server = runCatching {
+                response.use {
+                    if (!it.isSuccessful) return@use null
+                    val source = it.body?.source() ?: return@use null
+                    if (source.request(16 * 1024L + 1)) return@use null
+                    val metadata = JSONObject(source.readUtf8())
+                    val name = metadata.optString("name")
+                    if (metadata.optInt("protocol") != 1 || !metadata.has("pairingEnabled") || !name.startsWith("AlreadyOn ")) null
+                    else TvServer(name.take(128), origin)
+                }
+            }.getOrNull()
+            if (continuation.isActive) continuation.resume(server)
+        }
+    })
+}
+
+/** Includes only the actual on-link subnet; prioritize nearby addresses on broad LANs. */
+internal fun subnetCandidates(address: ByteArray, prefixLength: Int): Sequence<String> = sequence {
+    if (address.size != 4 || prefixLength !in 0..32) return@sequence
+    val own = address.fold(0L) { value, byte -> (value shl 8) or (byte.toLong() and 255) }
+    val prefix = prefixLength.coerceAtLeast(16)
+    val mask = (0xffffffffL shl (32 - prefix)) and 0xffffffffL
+    val start = own and mask
+    val end = start or (mask xor 0xffffffffL)
+    val nearbyStart = maxOf(start, own and 0xffffff00L)
+    val nearbyEnd = minOf(end, (own and 0xffffff00L) or 255)
+    fun eligible(value: Long) = value != own && (prefix >= 31 || (value != start && value != end))
+    fun text(value: Long) = listOf(24, 16, 8, 0).joinToString(".") { ((value shr it) and 255).toString() }
+    for (value in nearbyStart..nearbyEnd) if (eligible(value)) yield(text(value))
+    for (value in start..end) if (value !in nearbyStart..nearbyEnd && eligible(value)) yield(text(value))
 }
 
 internal fun privateAddress(address: InetAddress): Boolean = address.isSiteLocalAddress || address.isLoopbackAddress ||

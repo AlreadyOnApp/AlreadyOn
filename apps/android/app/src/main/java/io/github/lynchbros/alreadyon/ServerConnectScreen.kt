@@ -61,7 +61,8 @@ private suspend fun probe(server: TvServer): TvTrust = withContext(Dispatchers.I
 @Composable
 internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier: Modifier) {
     val context = LocalContext.current
-    val servers = remember { mutableStateListOf<TvServer>() }
+    val recent = remember { serverOrigin(state.origin)?.let { TvServer("Recently connected server", it) } }
+    val servers = remember { mutableStateListOf<TvServer>().apply { recent?.let { add(it) } } }
     var scan by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<TvServer?>(null) }
     var trust by remember { mutableStateOf<TvTrust?>(null) }
@@ -69,7 +70,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     var checking by remember { mutableStateOf(false) }
     var pin by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf(state.origin) }
+    var address by remember { mutableStateOf("https://") }
     var manualEntry by remember { mutableStateOf(false) }
     var remaining by remember { mutableIntStateOf(30) }
     val scope = rememberCoroutineScope()
@@ -103,8 +104,10 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     DisposableEffect(scan, remaining == 0, manualEntry, selected) {
         if (remaining == 0 || manualEntry || selected != null) return@DisposableEffect onDispose {}
         val discovery = TvDiscovery(context, found = { server ->
-            servers.removeAll { it.name == server.name }; servers.add(server)
-        }, lost = { name -> servers.removeAll { it.name == name } }, failed = { error = it })
+            val index = servers.indexOfFirst { it.origin == server.origin }
+            if (index < 0) servers.add(server)
+            else if (server.origin != recent?.origin) servers[index] = server
+        }, failed = { error = it })
         onDispose { discovery.close() }
     }
     Box(modifier.fillMaxWidth(), contentAlignment = if (BuildConfig.IS_TV) Alignment.Center else Alignment.TopStart) {
@@ -125,16 +128,20 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     }, enabled = !checking && !state.busy) { Text("${server.name} · ${server.origin.removePrefix("https://")}") }
                 }
             }
-            if (BuildConfig.IS_TV || remaining == 0) {
+            if (remaining == 0) {
                 OutlinedTextField(address, { address = it; manualEntry = true }, label = { Text("HTTPS server address") },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
                 Button(modifier = Modifier.tvFocusOutline(), onClick = {
-                    val origin = serverOrigin(address)
+                    val input = address.trim().let { if ("://" in it) it else "https://$it" }
+                    val origin = serverOrigin(input)?.toHttpUrl()?.let { url ->
+                        if (url.port == 443 && java.net.URI(input).port == -1) url.newBuilder().port(19900).build().toString().removeSuffix("/")
+                        else url.toString().removeSuffix("/")
+                    }
                     if (origin == null) error = "Enter a valid HTTPS server address."
                     else select(TvServer("AlreadyOn server", origin))
-                }, enabled = address.isNotBlank() && !checking && !state.busy) { Text("Check Server") }
+                }, enabled = address.removePrefix("https://").isNotBlank() && !checking && !state.busy) { Text("Check Server") }
             }
-            Button(modifier = Modifier.tvFocusOutline(), onClick = { servers.clear(); error = null; manualEntry = false; remaining = 30; scan++ }) { Text("Rescan") }
+            Button(modifier = Modifier.tvFocusOutline(), onClick = { servers.clear(); recent?.let { servers.add(it) }; error = null; manualEntry = false; remaining = 30; scan++ }) { Text("Rescan") }
         } else {
             Text("${selected!!.name} · ${selected!!.origin.removePrefix("https://")}", style = MaterialTheme.typography.headlineSmall)
             if (checking) Text("Checking server…")

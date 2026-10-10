@@ -7,9 +7,9 @@ services:
     image: ghcr.io/alreadyonapp/alreadyon:stable
     container_name: alreadyon
     restart: unless-stopped
-    # Required for home-LAN mDNS discovery on Linux Docker Engine.
-    # Host mode binds HTTPS 19900 and optional HTTP-01 19902 directly.
-    network_mode: host
+    ports:
+      - '19900:19900' # Native clients scan this published HTTPS port on the LAN.
+      - '19902:19902' # Optional HTTP-01: forward public TCP/80 here for certificate validation.
     devices:
       - /dev/dri:/dev/dri
     # Optional for hardware transcoding when running as a non-root `user:`.
