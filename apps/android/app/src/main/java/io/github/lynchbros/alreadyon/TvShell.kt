@@ -57,6 +57,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
     }
     BackHandler(enabled = fullscreen || state.settings != null || state.profile != null) {
         when {
+            state.tvTutorial -> model.finishTvTutorial()
             fullscreen -> { fullscreen = false; returnToGuide(); manager.clearFocus() }
             state.settings != null -> model.closeSettings()
             else -> guideBack()
@@ -67,6 +68,13 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
         Surface(Modifier.fillMaxSize(), color = palette.background, contentColor = palette.text) {
         Column(Modifier.fillMaxSize().padding(if (fullscreen) 0.dp else 24.dp)
             .onPreviewKeyEvent { event ->
+                if (state.tvTutorial) {
+                    if (event.key == Key.Back) {
+                        if (event.type == KeyEventType.KeyUp) model.finishTvTutorial()
+                        return@onPreviewKeyEvent true
+                    }
+                    return@onPreviewKeyEvent false
+                }
                 if (!fullscreen) {
                     if (state.profile == null || state.settings != null) return@onPreviewKeyEvent false
                     when (event.key) {
@@ -118,7 +126,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
             if (!fullscreen) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 PhoneBrand()
-                if (state.profile != null) ProfileMenu(state, model, Modifier.focusRequester(profileFocus).onFocusChanged { if (it.isFocused) region = "profile" })
+                if (state.profile != null && !state.tvTutorial) ProfileMenu(state, model, Modifier.focusRequester(profileFocus).onFocusChanged { if (it.isFocused) region = "profile" })
             }
             if (!fullscreen) {
                 if (state.signedIn) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -130,6 +138,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                 state.settings == "account" -> AccountScreen(state, model)
                 state.settings == "profile" -> ProfileSettingsScreen(state, model)
                 state.profile == null -> ProfileScreen(state, model, Modifier.weight(1f))
+                state.tvTutorial -> TvNavigationTutorial(Modifier.weight(1f), model::finishTvTutorial)
                 else -> {
                     if (state.channel != null) {
                         // One player call site keeps the stream/settings alive when returning to the guide.
