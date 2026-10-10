@@ -187,6 +187,9 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
                 state.notice?.let { item { Text(it) } }
                 item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(modifier = Modifier.tvFocusOutline(), onClick = {
+                        val savedSection = section
+                        // Save disables this button and inserts a notice; move focus before either can choose a fallback.
+                        if (tv) sidebarFocus.getValue(savedSection).requestFocus()
                         val patch = JSONObject()
                         if (name.trim() != profile.name) patch.put("name", name.trim())
                         if (upload == null && icon != profile.icon) patch.put("icon", icon ?: JSONObject.NULL)
@@ -200,7 +203,10 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
                             name = saved.name; icon = saved.icon; upload = null
                             time = saved.timeFormat; audio = saved.language
                             subtitles = saved.subtitles; language = saved.subtitleLanguage
-                            if (tv) sidebarFocus.getValue(section).requestFocus()
+                            if (tv) {
+                                section = savedSection
+                                sidebarFocus.getValue(savedSection).requestFocus()
+                            }
                         }
                     }, enabled = changed && !state.busy && !processing && name.isNotBlank()) { Text("Save Changes") }
                     OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings, modifier = Modifier.tvFocusOutline()) { Text("Cancel") }
