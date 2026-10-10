@@ -20,8 +20,10 @@ type folderBrowserResponse struct {
 	Folders []browsedFolder `json:"folders"`
 }
 
-// Mounted under the authenticated management API. Lists directories only;
-// access uses the same OS permissions as the library scanner.
+// Owner-only management route (enforced by auth.RoleAllows). Selecting a new
+// root requires browsing outside the existing library roots, intentionally.
+// Lists directory names only, using the same OS permissions as the scanner;
+// this does not grant playback access, which checks configured root confinement.
 func handleBrowseFolders(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 	if path == "" {
