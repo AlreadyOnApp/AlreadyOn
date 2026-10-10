@@ -12,7 +12,7 @@ In the WebUI, open **Admin Settings → TV Sign-In**. Each signed-in account set
 
 The server advertises `_alreadyon._tcp.local.` over mDNS on private-network interfaces. The TV scans for servers, shows name/IP, automatically accepts the instance certificate, and prompts for username and account TV PIN over validated HTTPS. TV offers manual HTTPS entry during its 30-second search; typing stops discovery. Mobile offers manual entry after 30 seconds. Passwords are not used for native-app sign-in.
 
-TV pairing requires a direct private/loopback/link-local HTTPS peer and has per-peer and aggregate attempt limits. Disabled accounts and accounts requiring password changes cannot pair. Guest Wi-Fi, firewalls and container bridge networks can block mDNS; UDP 5353 must reach the LAN and the advertised HTTPS address must be reachable. Discovery failure does not stop server playback.
+TV pairing requires a direct private/loopback/link-local HTTPS peer and has per-peer and aggregate attempt limits. Disabled accounts and accounts requiring password changes cannot pair. Docker deployments require host networking for LAN discovery; see [deployment](../deploy/README.md). Guest Wi-Fi and firewalls can block mDNS; UDP 5353 must reach the LAN and the advertised HTTPS address must be reachable. Discovery failure does not stop server playback.
 
 ## Build and emulator validation
 

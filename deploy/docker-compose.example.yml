@@ -7,9 +7,9 @@ services:
     image: ghcr.io/alreadyonapp/alreadyon:stable
     container_name: alreadyon
     restart: unless-stopped
-    ports:
-      - '19900:19900'
-      - '19902:19902' # Add a TCP/80 Port Forward rule on your router to TCP/19902 to this host port for Let's Encrypt Cert Validation.
+    # Required for home-LAN mDNS discovery on Linux Docker Engine.
+    # Host mode binds HTTPS 19900 and optional HTTP-01 19902 directly.
+    network_mode: host
     devices:
       - /dev/dri:/dev/dri
     # Optional for hardware transcoding when running as a non-root `user:`.
