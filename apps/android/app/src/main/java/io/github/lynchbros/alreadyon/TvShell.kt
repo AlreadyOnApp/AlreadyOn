@@ -56,6 +56,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                 if (!fullscreen) return@onPreviewKeyEvent false
                 when (event.key) {
                     Key.DirectionLeft, Key.DirectionRight -> {
+                        if (controlsVisible) return@onPreviewKeyEvent false
                         if (event.type == KeyEventType.KeyUp) model.stepChannel(if (event.key == Key.DirectionRight) 1 else -1)
                         true
                     }
@@ -86,7 +87,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                 state.mustChangePassword -> AccountScreen(state, model, forced = true)
                 state.settings == "account" -> AccountScreen(state, model)
                 state.settings == "profile" -> ProfileSettingsScreen(state, model)
-                state.profile == null -> ProfileScreen(state, model)
+                state.profile == null -> ProfileScreen(state, model, Modifier.weight(1f))
                 else -> {
                     if (state.channel != null) {
                         // One player call site keeps the stream/settings alive when returning to the guide.
@@ -95,7 +96,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                             PhonePlayer(state, model,
                                 if (fullscreen) Modifier.fillMaxSize() else Modifier.width(320.dp).fillMaxHeight(),
                                 fullscreen = fullscreen, tv = true, controlsSignal = controlsSignal,
-                                onControlsVisibility = { controlsVisible = it }, onFullscreen = { fullscreen = !fullscreen })
+                                onControlsVisibility = { controlsVisible = it }, onFullscreen = { if (!fullscreen) model.unmute(); fullscreen = !fullscreen })
                             if (!fullscreen) Column(Modifier.weight(1f).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("${state.channel.number} · ${state.channel.name}", style = MaterialTheme.typography.titleLarge)
                                 state.playback?.let { playback ->
@@ -107,7 +108,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                         }
                     }
                     if (!fullscreen) ChannelGuide(state, model, palette, Modifier.weight(1f)) { channel ->
-                        model.watch(channel); fullscreen = true
+                        model.unmute(); model.watch(channel); fullscreen = true
                     }
                 }
             }

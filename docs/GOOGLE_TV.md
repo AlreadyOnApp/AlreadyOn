@@ -4,7 +4,9 @@
 
 The `:tv` target shares networking, profiles, guide, branding, quality, mute, audio and subtitles with mobile `:app`. TV uses fixed landscape and a Leanback launcher. It starts with a compact player above the guide. Channel selection opens fullscreen; Back restores the guide without retuning.
 
-In fullscreen, Right tunes higher and Left lower. Up/Down reveals controls, then navigates them; Select activates the focused control. Playback settings survive tuning and presentation changes.
+The centered chooser says **Select Profile**. Guide Up/Down reaches offscreen channels; offscreen programs skip rendering. Channel selection opens fullscreen and unmutes.
+
+Fullscreen Left/Right tunes channels with controls hidden, or navigates visible controls. Up/Down reveals controls, then navigates them; Select activates the focused control. Playback settings survive tuning and presentation changes.
 
 ## Connect
 
