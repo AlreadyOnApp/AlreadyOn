@@ -78,7 +78,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                 if (state.profile != null) ProfileMenu(state, model)
             }
             if (!fullscreen) {
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (state.signedIn) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             when {

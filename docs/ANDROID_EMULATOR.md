@@ -10,6 +10,6 @@ An emulator's loopback is separate from the host's loopback. Use the emulator's 
 
 Use synthetic media and a disposable server for destructive tests. Validate authentication, guide navigation, tuning, transitions, screen rotation and background recovery. Sanitize logs before sharing them: tokens, cookies, usernames, media names and local addresses may be present.
 
-For Google TV, enable the AVD hardware keyboard and use arrow keys plus Enter as the remote. Back returns from fullscreen to the guide. Enable a touch screen in the test AVD if mouse clicks are wanted; TV profiles normally disable touch. If the emulator window stops updating or reports color-buffer errors, cold boot with software graphics. These are emulator settings, not TV app requirements.
+For Google TV, enable the AVD hardware keyboard and use arrow keys plus Enter as the remote. Back returns from fullscreen to the guide. TV setup forms are centered; confirm the username to open the centered PIN keypad, then select “✓ Done” to dismiss it and Connect to sign in. Enable a touch screen in the test AVD if mouse clicks are wanted; TV profiles normally disable touch. If the emulator window stops updating or reports color-buffer errors, cold boot with software graphics. These are emulator settings, not TV app requirements.
 
 Emulator success does not establish physical-device codec, HDR, hardware-decoder or television behavior. Record those checks separately.
