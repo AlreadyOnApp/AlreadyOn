@@ -2906,8 +2906,10 @@ const noWorkers = async (unreleased = () => 0) => {
       "Saved Hardware Encoding/Decoding should survive a reload",
     );
     assert((await page.getByLabel("Server Name", { exact: true }).inputValue()) === "Family E2E Library", "Friendly server name survives a reload");
-    const advertised = await (await page.request.get(url + "/api/tv/server")).json();
-    assert(advertised.name === "Family E2E Library" && advertised.service === "alreadyon", "Native discovery immediately uses the renamed server");
+    // Browser fixtures run through a proxy; LAN pairing metadata deliberately rejects proxy headers.
+    // Direct HTTPS name propagation is covered by server_name_test.go instead.
+    const namedSettings = await (await page.request.get(url + "/api/settings/server")).json();
+    assert(namedSettings.serverName === "Family E2E Library", "Settings API immediately uses the renamed server");
     assert(
       await save.isDisabled(),
       "Save Changes should be off again after saving",
