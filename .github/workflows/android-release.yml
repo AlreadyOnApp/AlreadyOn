@@ -11,6 +11,8 @@ on:
       - 'apps/android/gradlew*'
       - '.github/workflows/android-release.yml'
       - 'scripts/ci/android-release.py'
+      - 'scripts/ci/release_notes.py'
+      - 'docs/release-notes/**'
   workflow_dispatch:
     inputs:
       operation:
