@@ -129,6 +129,8 @@ const noWorkers = async (unreleased = () => 0) => {
       await username.fill(account.username);
       await visibility(password, account.password);
       if (setup) {
+        const name = dialog.getByLabel("Server Name", { exact: true });
+        await name.fill("AlreadyOn E2E Library");
         const confirmation = dialog.getByLabel("Confirm password");
         assert(
           (await confirmation.getAttribute("name")) === "confirmPassword" &&
@@ -2808,6 +2810,7 @@ const noWorkers = async (unreleased = () => 0) => {
     assert(
       JSON.stringify(names) ===
         JSON.stringify([
+          "Server Name",
           "Hardware Encoding",
           "Hardware Decoding",
           "Loudness Detection",
@@ -2893,6 +2896,7 @@ const noWorkers = async (unreleased = () => 0) => {
     assert(await save.isDisabled(), "Save Changes should wait for a change");
     await row.locator("select").selectOption("intel");
     await decodeRow.locator("select").selectOption("on");
+    await page.getByLabel("Server Name", { exact: true }).fill("Family E2E Library");
     assert(await save.isEnabled(), "Save Changes should enable after a change");
     await Promise.all([page.waitForNavigation(), save.click()]);
     await page.locator(".settings-grid").waitFor();
@@ -2901,6 +2905,9 @@ const noWorkers = async (unreleased = () => 0) => {
         (await decodeRow.locator("select").inputValue()) === "on",
       "Saved Hardware Encoding/Decoding should survive a reload",
     );
+    assert((await page.getByLabel("Server Name", { exact: true }).inputValue()) === "Family E2E Library", "Friendly server name survives a reload");
+    const advertised = await (await page.request.get(url + "/api/tv/server")).json();
+    assert(advertised.name === "Family E2E Library" && advertised.service === "alreadyon", "Native discovery immediately uses the renamed server");
     assert(
       await save.isDisabled(),
       "Save Changes should be off again after saving",

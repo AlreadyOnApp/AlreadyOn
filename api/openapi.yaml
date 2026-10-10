@@ -198,9 +198,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [name, pairingEnabled, protocol]
+                required: [name, service, pairingEnabled, protocol]
                 properties:
-                  name: {type: string}
+                  name: {type: string, minLength: 1, maxLength: 64}
+                  service: {type: string, enum: [alreadyon]}
                   pairingEnabled: {type: boolean}
                   protocol: {type: integer, enum: [1]}
         '403':
@@ -335,7 +336,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Credentials'
+              allOf:
+                - $ref: '#/components/schemas/Credentials'
+                - type: object
+                  properties:
+                    serverName:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                      description: Friendly LAN discovery name. Omitted by legacy clients defaults to AlreadyOn. Surrounding whitespace is trimmed; control characters are rejected.
       responses:
         '201':
           description: Account created and signed in
@@ -4067,6 +4076,11 @@ components:
     ServerSettings:
       type: object
       properties:
+        serverName:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Friendly name returned to native LAN discovery clients; defaults to AlreadyOn. Surrounding whitespace is trimmed; control characters are rejected.
         transcoding:
           type: string
           enum: [software, intel, nvidia-nvenc, amd-vaapi]

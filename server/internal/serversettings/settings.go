@@ -8,7 +8,10 @@ import (
 	"errors"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 var (
@@ -19,6 +22,7 @@ var (
 )
 
 var (
+	ErrInvalidServerName  = errors.New("serverName must be 1–64 characters with no control characters")
 	ErrInvalidTranscoding = errors.New("transcoding must be one of: software, intel, nvidia-nvenc, amd-vaapi")
 	ErrInvalidTLSMode     = errors.New("tlsMode must be one of: self-signed, user-provided, acme")
 	ErrInvalidACME        = errors.New("acmeProvider must be letsencrypt")
@@ -32,6 +36,7 @@ var (
 var domainPattern = regexp.MustCompile(`^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$`)
 
 type Settings struct {
+	ServerName   string
 	Transcoding  string
 	TLSMode      string
 	ACMEProvider string
@@ -43,6 +48,7 @@ type Settings struct {
 
 // Update lists the fields to change; nil fields are left alone.
 type Update struct {
+	ServerName       *string
 	Transcoding      *string
 	TLSMode          *string
 	ACMEProvider     *string
@@ -53,8 +59,8 @@ type Update struct {
 
 func Get(ctx context.Context, db *sql.DB) (Settings, error) {
 	var s Settings
-	err := db.QueryRowContext(ctx, `SELECT transcoding, tls_mode, acme_provider, acme_domain, ddns_provider, hardware_decoding FROM server_settings WHERE id = 1`).
-		Scan(&s.Transcoding, &s.TLSMode, &s.ACMEProvider, &s.ACMEDomain, &s.DDNSProvider, &s.HardwareDecoding)
+	err := db.QueryRowContext(ctx, `SELECT server_name, transcoding, tls_mode, acme_provider, acme_domain, ddns_provider, hardware_decoding FROM server_settings WHERE id = 1`).
+		Scan(&s.ServerName, &s.Transcoding, &s.TLSMode, &s.ACMEProvider, &s.ACMEDomain, &s.DDNSProvider, &s.HardwareDecoding)
 	return s, err
 }
 
@@ -67,9 +73,15 @@ func Save(ctx context.Context, db *sql.DB, u Update) (Settings, error) {
 	defer tx.Rollback()
 
 	var s Settings
-	if err := tx.QueryRowContext(ctx, `SELECT transcoding, tls_mode, acme_provider, acme_domain, ddns_provider, hardware_decoding FROM server_settings WHERE id = 1`).
-		Scan(&s.Transcoding, &s.TLSMode, &s.ACMEProvider, &s.ACMEDomain, &s.DDNSProvider, &s.HardwareDecoding); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT server_name, transcoding, tls_mode, acme_provider, acme_domain, ddns_provider, hardware_decoding FROM server_settings WHERE id = 1`).
+		Scan(&s.ServerName, &s.Transcoding, &s.TLSMode, &s.ACMEProvider, &s.ACMEDomain, &s.DDNSProvider, &s.HardwareDecoding); err != nil {
 		return Settings{}, err
+	}
+	if u.ServerName != nil {
+		s.ServerName, err = ValidateServerName(*u.ServerName)
+		if err != nil {
+			return Settings{}, err
+		}
 	}
 	if u.Transcoding != nil {
 		if !slices.Contains(Transcoding, *u.Transcoding) {
@@ -112,9 +124,9 @@ func Save(ctx context.Context, db *sql.DB, u Update) (Settings, error) {
 		s.HardwareDecoding = *u.HardwareDecoding
 	}
 
-	if _, err := tx.ExecContext(ctx, `UPDATE server_settings SET transcoding = ?, tls_mode = ?, acme_provider = ?, acme_domain = ?,
+	if _, err := tx.ExecContext(ctx, `UPDATE server_settings SET server_name = ?, transcoding = ?, tls_mode = ?, acme_provider = ?, acme_domain = ?,
 		ddns_provider = ?, hardware_decoding = ?, updated_at_unix = unixepoch() WHERE id = 1`,
-		s.Transcoding, s.TLSMode, s.ACMEProvider, s.ACMEDomain, s.DDNSProvider, s.HardwareDecoding); err != nil {
+		s.ServerName, s.Transcoding, s.TLSMode, s.ACMEProvider, s.ACMEDomain, s.DDNSProvider, s.HardwareDecoding); err != nil {
 		return Settings{}, err
 	}
 	return s, tx.Commit()
@@ -134,4 +146,13 @@ func TunedThreads(ctx context.Context, db *sql.DB) (threads int, at time.Time, e
 func SaveTunedThreads(ctx context.Context, db *sql.DB, threads int, at time.Time) error {
 	_, err := db.ExecContext(ctx, `UPDATE server_settings SET tuned_threads = ?, tuned_at_unix = ? WHERE id = 1`, threads, at.Unix())
 	return err
+}
+
+// ValidateServerName normalizes surrounding whitespace; names are labels, not DNS hosts.
+func ValidateServerName(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" || utf8.RuneCountInString(value) > 64 || strings.IndexFunc(value, unicode.IsControl) >= 0 {
+		return "", ErrInvalidServerName
+	}
+	return value, nil
 }

@@ -12,7 +12,7 @@ func TestServerSettings_DefaultsThenPartialUpdate(t *testing.T) {
 	rec := doJSON(t, router, http.MethodGet, "/api/settings/server", "")
 	var s serverSettingsResponse
 	json.Unmarshal(rec.Body.Bytes(), &s)
-	want := serverSettingsResponse{"software", "self-signed", "letsencrypt", "", "none", false}
+	want := serverSettingsResponse{"AlreadyOn", "software", "self-signed", "letsencrypt", "", "none", false}
 	if rec.Code != http.StatusOK || s != want {
 		t.Fatalf("defaults = %d %+v, want %+v", rec.Code, s, want)
 	}
@@ -34,6 +34,8 @@ func TestServerSettings_DefaultsThenPartialUpdate(t *testing.T) {
 func TestServerSettings_RejectsInvalidValues(t *testing.T) {
 	router := NewRouter(t.TempDir(), t.TempDir(), openTestDB(t))
 	for _, body := range []string{
+		`{"serverName":"   "}`,
+		`{"serverName":"bad\nname"}`,
 		`{"transcoding":"quantum"}`,
 		`{"tlsMode":"none"}`,
 		`{"acmeProvider":"nobody"}`,

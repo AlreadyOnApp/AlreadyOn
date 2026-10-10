@@ -647,6 +647,7 @@ export async function verifyProfilePin(id: number, pin: string): Promise<PinChec
 }
 
 export interface ServerSettings {
+  serverName: string;
   transcoding: string;
   tlsMode: string;
   acmeProvider: string;

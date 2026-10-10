@@ -29,7 +29,7 @@ internal data class PhonePlayback(val url: String, val title: String, val startM
 internal data class PhoneState(
     val username: String = "", val role: String = "viewer", val mustChangePassword: Boolean = false,
     val passwordLocked: Boolean = true, val settings: String? = null, val notice: String? = null,
-    val origin: String = "", val bypassTls: Boolean = false, val trustedCa: String? = null, val signedIn: Boolean = false, val busy: Boolean = false,
+    val origin: String = "", val serverName: String = "AlreadyOn", val bypassTls: Boolean = false, val trustedCa: String? = null, val signedIn: Boolean = false, val busy: Boolean = false,
     val error: String? = null, val profiles: List<ViewerProfile> = emptyList(),
     val profile: ViewerProfile? = null, val channels: List<GuideChannel> = emptyList(),
     val channel: GuideChannel? = null, val playback: PhonePlayback? = null,
@@ -41,7 +41,7 @@ internal data class PhoneState(
 internal class PhoneModel(application: Application) : AndroidViewModel(application) {
     private val sessionStore = SessionStore(application)
     private val preferences = application.getSharedPreferences("connection", Application.MODE_PRIVATE)
-    private val mutable = MutableStateFlow(PhoneState(origin = preferences.getString("server_origin", "").orEmpty(), bypassTls = preferences.getBoolean("bypass_tls", false), trustedCa = preferences.getString("trusted_ca", null)))
+    private val mutable = MutableStateFlow(PhoneState(serverName = preferences.getString("server_name", "AlreadyOn").orEmpty(), origin = preferences.getString("server_origin", "").orEmpty(), bypassTls = preferences.getBoolean("bypass_tls", false), trustedCa = preferences.getString("trusted_ca", null)))
     val state = mutable.asStateFlow()
     private var client: ServerClient? = null
     private var action: Job? = null
@@ -96,7 +96,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         stopWatching()
         client?.clearSession(); client = null
         preferences.edit().remove("profile_id").apply()
-        update { PhoneState(origin = it.origin, bypassTls = it.bypassTls, trustedCa = it.trustedCa) }
+        update { PhoneState(origin = it.origin, serverName = it.serverName, bypassTls = it.bypassTls, trustedCa = it.trustedCa) }
     }
 
     fun login(rawOrigin: String, username: String, password: String, bypassTls: Boolean = false) = perform {
@@ -117,7 +117,7 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
     }
 
     /** Native clients accept an instance CA before sending its PIN or saving a session. */
-    fun signInWithPIN(origin: String, username: String, pin: String, trustedCa: String) = perform {
+    fun signInWithPIN(origin: String, username: String, pin: String, trustedCa: String, serverName: String = "AlreadyOn") = perform {
         val normalized = serverOrigin(origin) ?: throw IOException("Invalid local server address.")
         client?.clearSession()
         val api = ServerClient(normalized, sessionStore, trustedCa = trustedCa)
@@ -125,8 +125,8 @@ internal class PhoneModel(application: Application) : AndroidViewModel(applicati
         if (!status.optBoolean("authenticated")) throw IOException("TV PIN was not accepted.")
         client = api
         preferences.edit().putString("server_origin", normalized).putBoolean("bypass_tls", false)
-            .putString("trusted_ca", trustedCa).commit()
-        update { it.copy(origin = normalized, bypassTls = false, trustedCa = trustedCa) }
+            .putString("trusted_ca", trustedCa).putString("server_name", serverName).commit()
+        update { it.copy(origin = normalized, serverName = serverName, bypassTls = false, trustedCa = trustedCa) }
         readAccount(status)
         val profiles = api.profiles()
         update { it.copy(profiles = profiles) }
