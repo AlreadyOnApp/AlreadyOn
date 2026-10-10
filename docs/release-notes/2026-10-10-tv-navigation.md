@@ -1,3 +1,5 @@
+<!-- android-release -->
+
 ## Features
 
 - Configure the current TV profile’s name, icon, PIN, time format, audio language and subtitle defaults with the remote in a full-screen Profile Settings page.

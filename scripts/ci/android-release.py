@@ -11,11 +11,12 @@ import subprocess
 import tempfile
 import time
 from zoneinfo import ZoneInfo
-from release_notes import changelog, published_changelog, release_body
+from release_notes import changelog, changelog_since, published_changelog, release_body
 
-# New releases use beta tags; retain verification and promotion of already published RC assets.
-CANDIDATE = re.compile(r"(\d{4}-\d{2}-\d{2})-(?:beta|rc)([1-9]\d*)\Z")
-BETA = re.compile(r"(\d{4}-\d{2}-\d{2})-beta([1-9]\d*)\Z")
+# New releases use one unnumbered beta per date; older numbered beta/RC tags remain verifiable.
+CANDIDATE = re.compile(r"(\d{4}-\d{2}-\d{2})-(?:beta(?:[1-9]\d*)?|rc[1-9]\d*)\Z")
+BETA = re.compile(r"(\d{4}-\d{2}-\d{2})-beta(?:[1-9]\d*)?\Z")
+RELEASE_BASELINE = re.compile(r"(\d{4}-\d{2}-\d{2})-(rc[1-9]\d*|beta(?:[1-9]\d*)?|stable)\Z")
 ASSETS = ("alreadyon-android.apk", "SHA256SUMS", "android-release.json", "alreadyon-tv.apk")
 
 
@@ -33,10 +34,26 @@ def releases(repo):
     return [release for page in pages for release in page]
 
 
-def next_tag(day, tags):
-    numbers = [int(match[2]) for tag in tags
-               if (match := BETA.fullmatch(tag)) and match[1] == day]
-    return f"{day}-beta{max(numbers, default=0) + 1}"
+def daily_beta_tag(day):
+    return f"{day}-beta"
+
+
+def previous_release_tag(entries, day):
+    """Choose the latest published Android release from an earlier date."""
+    candidates = []
+    for entry in entries:
+        match = RELEASE_BASELINE.fullmatch(entry["tag_name"])
+        if entry.get("draft", False) or match is None or match[1] >= day:
+            continue
+        suffix = match[2]
+        if suffix == "stable":
+            phase, sequence = 2, 0
+        elif suffix.startswith("beta"):
+            phase, sequence = 1, int(suffix[4:]) if suffix != "beta" else 0
+        else:
+            phase, sequence = 0, int(suffix[2:])
+        candidates.append((match[1], phase, sequence, entry["tag_name"]))
+    return max(candidates)[3] if candidates else None
 
 
 def digest(path):
@@ -130,8 +147,13 @@ def plan(repo, sha):
         tag, version_code = existing["tag_name"], int(code[1])
     else:
         day = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+        tag = daily_beta_tag(day)
+        occupied = next((entry for entry in entries if entry["tag_name"] == tag), None)
+        if occupied:
+            raise ValueError(f"Published {tag} belongs to another source; delete the release and tag before recreating it")
         tags = run("git", "tag", "--list").splitlines()
-        tag = next_tag(day, tags + [r["tag_name"] for r in entries])
+        if tag in tags:
+            raise ValueError(f"Git tag {tag} already exists; delete it before creating a new same-day beta")
         # Seconds since 2020 fit Android's signed-int limit and increase between builds.
         version_code = int(time.time()) - 1577836800
     print("existing=false")
@@ -150,16 +172,24 @@ def candidate(repo, tag, sha, code, directory):
     (directory / ASSETS[1]).write_text("".join(
         f"{digest(directory / name)}  {name}\n" for name in (ASSETS[0], ASSETS[2], ASSETS[3])))
     verify_assets(directory, sha)
-    stable_tags = [entry['tag_name'] for entry in releases(repo)
-                   if not entry['draft'] and not entry['prerelease']]
-    notes = release_body(repo, tag, sha, code, changelog(sha, stable_tags))
+    entries = releases(repo)
+    date = CANDIDATE.fullmatch(tag)[1]
+    baseline_tag = previous_release_tag(entries, date)
+    if baseline_tag:
+        baseline_sha = api(f"repos/{repo}/commits/{baseline_tag}")["sha"]
+        changes = changelog_since(sha, baseline_sha)
+    else:
+        stable_tags = [entry['tag_name'] for entry in entries
+                       if not entry['draft'] and not entry['prerelease']]
+        changes = changelog(sha, stable_tags)
+    notes = release_body(repo, tag, sha, code, changes, changelog_baseline=baseline_tag)
     publish(repo, tag, sha, directory, notes, True)
 
 
 def promote(repo, tag):
     match = CANDIDATE.fullmatch(tag)
     if match is None:
-        raise ValueError("Stable promotion requires a YYYY-MM-DD-betaN (or legacy rcN) candidate")
+        raise ValueError("Stable promotion requires a YYYY-MM-DD-beta (or legacy numbered beta/RC) candidate")
     release = api(f"repos/{repo}/releases/tags/{tag}")
     if release["draft"] or not release["prerelease"]:
         raise ValueError("Select a published Android release candidate")

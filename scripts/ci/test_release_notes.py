@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from release_notes import changelog, published_changelog, release_body, render_fragments
+from release_notes import changelog, changelog_since, published_changelog, release_body, render_fragments
 
 
 class ReleaseNotesTests(unittest.TestCase):
@@ -31,6 +31,12 @@ class ReleaseNotesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             published_changelog('Technical notes only.')
 
+    def test_candidate_changelog_records_its_explicit_baseline(self):
+        body = release_body('owner/repo', '2026-10-10-beta', 'a' * 40, 123,
+                            '## Features\n\n- Enter a server address immediately.',
+                            changelog_baseline='2026-10-09-rc3')
+        self.assertIn('Changelog baseline: `2026-10-09-rc3`', body)
+
     def test_git_range_uses_reachable_stable_and_release_snapshot(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -45,10 +51,12 @@ class ReleaseNotesTests(unittest.TestCase):
             git('add', '.')
             git('commit', '-qm', 'First feature')
             git('tag', '2026-10-08-stable')
-            (directory / 'second.md').write_text('## Bug fixes\n\n- New fix.\n')
+            (directory / 'second.md').write_text('<!-- android-release -->\n\n## Bug fixes\n\n- New fix.\n')
+            (directory / 'server.md').write_text('## Bug fixes\n\n- Server-only fix.\n')
             git('add', '.')
             git('commit', '-qm', 'New fix')
             sha = git('rev-parse', 'HEAD')
+            baseline = git('rev-parse', '2026-10-08-stable')
             # A dirty working tree cannot leak unreleased changes into this APK's notes.
             (directory / 'second.md').write_text('## Features\n\n- Future feature.\n')
             previous = os.getcwd()
@@ -58,6 +66,13 @@ class ReleaseNotesTests(unittest.TestCase):
                 self.assertIn('New fix.', result)
                 self.assertNotIn('Old feature.', result)
                 self.assertNotIn('Future feature.', result)
+                candidate = changelog_since(sha, baseline)
+                self.assertIn('New fix.', candidate)
+                self.assertNotIn('Old feature.', candidate)
+                self.assertNotIn('Server-only fix.', candidate)
+                self.assertNotIn('Future feature.', candidate)
+                with self.assertRaisesRegex(ValueError, 'ancestor'):
+                    changelog_since(baseline, sha)
                 self.assertIn('Old feature.', changelog(sha, []))
                 self.assertIn('No new user-facing changes', changelog('2026-10-08-stable', ['2026-10-08-stable']))
             finally:
