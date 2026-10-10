@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.focusGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
@@ -42,6 +44,11 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
     var section by remember { mutableStateOf(sections.first()) }
     val sidebarFocus = remember { sections.associateWith { FocusRequester() } }
     val primaryFocus = remember { sections.associateWith { FocusRequester() } }
+    var inControls by remember { mutableStateOf(false) }
+    // Popups and the keyboard dismiss first; the settings screen then unwinds focus before leaving.
+    BackHandler(enabled = tv) {
+        if (inControls) sidebarFocus.getValue(section).requestFocus() else model.closeSettings()
+    }
     fun entryModifier(title: String) = if (tv) Modifier.focusRequester(primaryFocus.getValue(title)).focusProperties { left = sidebarFocus.getValue(title) } else Modifier
     val cards = rememberLazyListState()
     LaunchedEffect(section) { if (tv) cards.scrollToItem(0) }
@@ -125,7 +132,7 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
                     }
                 }
             }
-            LazyColumn(Modifier.weight(1f), state = cards, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyColumn(Modifier.weight(1f).then(if (tv) Modifier.onFocusChanged { inControls = it.hasFocus }.focusGroup() else Modifier), state = cards, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item { OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings, modifier = Modifier.tvFocusOutline()) { Text("← Back To Guide") } }
                 if (!tv || section == "Display Name") item { SettingsCard("Display Name") { OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = entryModifier("Display Name").fillMaxWidth().tvFocusOutline()) } }
                 if (!tv || section == "Icon") item { SettingsCard("Icon") {
