@@ -10,7 +10,7 @@ In fullscreen, Right tunes higher and Left lower. Up/Down reveals controls, then
 
 First-run WebUI setup asks for **Server Name**, username and password. Owners can rename it under **Server Settings → Server → Server Name**. Discovery reflects changes without restarting. Existing servers default to `AlreadyOn`. Names are 1–64 characters after trimming, without control characters.
 
-Each account manages its unique 6–12 digit numeric PIN in **Admin Settings → TV Sign-In**. Leading zeros are supported. PINs are hashed and never returned. Replacing/removing a PIN prevents new sign-ins; revoke existing devices through **Signed-In Browsers**.
+Each account manages its unique 6–12 digit numeric PIN under **Admin Settings → TV Pairing Pin**, below the password fields. Leading zeros are supported. Use **Save Changes** to set it and **Remove Pin** to remove it. PINs are hashed and never returned. Replacing/removing a PIN prevents new sign-ins; revoke existing devices through **Signed-In Browsers**.
 
 Both apps scan private IPv4 HTTPS port 19900 with 32 concurrent probes. The recent server appears first and its name refreshes when found. Responses must identify AlreadyOn protocol 1. Larger networks search the device's /24 first, considering at most /16 worth of addresses. After 30 seconds, requests are cancelled and manual entry appears with `https://` prefilled. Bare addresses assume HTTPS and port 19900; explicit ports remain. Server selection cancels scanning; Rescan restarts it. Large or IPv6-only networks may require manual entry.
 

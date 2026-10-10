@@ -62,7 +62,7 @@ const DEFAULTS: Pick<ServerSettings, 'transcoding' | 'hardwareDecoding' | 'tlsMo
   ddnsProvider: 'none',
 };
 
-type InfoKey = 'encoding' | 'decoding' | 'tmdb' | 'free' | 'tls';
+type InfoKey = 'name' | 'encoding' | 'decoding' | 'tmdb' | 'free' | 'tls';
 
 // A grid row: the wrapper is display: contents, so the three cells (and an
 // optional note beneath them) lay out on the shared grid.
@@ -305,7 +305,7 @@ export default function ServerPage() {
       <RestartCard />
       <div className="admin-card">
         <div className="settings-grid">
-          <Row name="Server Name" control={<input aria-label="Server Name" type="text" value={draft.serverName} maxLength={64} required onChange={(e) => setDraft({ ...draft, serverName: e.target.value })} />} note={<p className="setting-note admin-section-hint">Shown when phones, tablets and TVs find this server.</p>} />
+          <Row name="Server Name" control={<input aria-label="Server Name" type="text" value={draft.serverName} maxLength={64} required onChange={(e) => setDraft({ ...draft, serverName: e.target.value })} />} actions={<Button onClick={() => setInfo('name')}>More Info</Button>} />
           <Row
             name="Hardware Encoding"
             control={
@@ -457,6 +457,9 @@ export default function ServerPage() {
 
       <SettingsActions hasChanges={hasChanges} onSave={handleSave} />
 
+      <InfoModal open={info === 'name'} title="Server Name" onClose={() => setInfo(null)}>
+        <p>Choose a recognizable name for this AlreadyOn server. Phones, tablets and TVs show this name when searching your home network, so you can tell servers apart before signing in. Save a new name to update what clients see during discovery.</p>
+      </InfoModal>
       <InfoModal open={info === 'encoding'} title="Hardware Encoding" onClose={() => setInfo(null)}>
         <p>
           Converting a video the browser can't play (or that is too large for the connection) is the most demanding thing the server does. <strong>Software Only</strong>{' '}
