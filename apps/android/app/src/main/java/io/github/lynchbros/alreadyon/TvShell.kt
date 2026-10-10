@@ -73,7 +73,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
     PhoneTheme {
         val palette = phonePalette
         Surface(Modifier.fillMaxSize(), color = palette.background, contentColor = palette.text) {
-        Column(Modifier.fillMaxSize().padding(if (fullscreen) 0.dp else 24.dp)
+        Column(Modifier.fillMaxSize().padding(if (fullscreen) 0.dp else 16.dp)
             .onPreviewKeyEvent { event ->
                 if (state.tvTutorial) {
                     if (event.key == Key.Back) {
@@ -129,15 +129,8 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
             // Only fullscreen needs a focus target to receive remote keys with hidden controls.
             // In the guide and sign-in screens, focus belongs to the actionable children.
             }.then(if (fullscreen) Modifier.focusRequester(focus).focusable() else Modifier),
-            verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 12.dp)) {
-            if (!fullscreen) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                PhoneBrand()
-                if (state.profile != null && !state.tvTutorial) ProfileMenu(state, model, Modifier.focusRequester(profileFocus).onFocusChanged { if (it.isFocused) region = "profile" },
-                    openSignal = profileOpenSignal, onMenuDismiss = {
-                        scope.launch { withFrameNanos { }; region = "player"; controlsSignal++ }
-                    })
-            }
+            verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 8.dp)) {
+            if (!fullscreen && (state.profile == null || state.settings != null || state.tvTutorial)) Row(Modifier.fillMaxWidth()) { PhoneBrand() }
             if (!fullscreen) {
                 if (state.signedIn) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 // Routine background refreshes must not animate or shift the TV layout.
@@ -152,14 +145,22 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                 else -> {
                     if (state.channel != null) {
                         // One player call site keeps the stream/settings alive when returning to the guide.
-                        Row(if (fullscreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(180.dp),
+                        Row(if (fullscreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(162.dp),
                             horizontalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 20.dp)) {
                             PhonePlayer(state, model,
-                                if (fullscreen) Modifier.fillMaxSize() else Modifier.width(320.dp).fillMaxHeight(),
+                                if (fullscreen) Modifier.fillMaxSize() else Modifier.width(288.dp).fillMaxHeight(),
                                 fullscreen = fullscreen, tv = true, tvActive = fullscreen || region == "player", controlsSignal = controlsSignal,
                                 onControlsVisibility = { controlsVisible = it }, onFullscreen = { if (!fullscreen) model.unmute(); fullscreen = !fullscreen; if (fullscreen) controlsSignal++ else returnToGuide() },
                                 onExitFullscreen = { fullscreen = false; returnToGuide() })
-                            if (!fullscreen) TvGuideDetails(selection, state.channel, palette, Modifier.weight(1f))
+                            if (!fullscreen) Box(Modifier.weight(1f).fillMaxHeight()) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    ProfileMenu(state, model, Modifier.focusRequester(profileFocus).onFocusChanged { if (it.isFocused) region = "profile" },
+                                        openSignal = profileOpenSignal, onMenuDismiss = {
+                                            scope.launch { withFrameNanos { }; region = "player"; controlsSignal++ }
+                                        })
+                                }
+                                TvGuideDetails(selection, state.channel, palette, Modifier.fillMaxSize())
+                            }
                         }
                     }
                     if (!fullscreen) TvGuide(state, palette, Modifier.weight(1f), resetSignal = guideReset,
@@ -179,13 +180,13 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
 @Composable
 private fun TvGuideDetails(selection: State<Pair<GuideChannel, GuideProgram?>?>, fallback: GuideChannel,
     palette: PhonePalette, modifier: Modifier) {
-    Column(modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         val channel = selection.value?.first ?: fallback
         val program = selection.value?.second
-        Text("${channel.number} · ${channel.name}", style = MaterialTheme.typography.titleLarge, maxLines = 1)
+        Text("${channel.number} · ${channel.name}", style = MaterialTheme.typography.titleLarge, maxLines = 1, modifier = Modifier.padding(end = 180.dp))
         program?.let {
             Text(it.title + (if (it.year > 0) " (${it.year})" else ""), style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.semantics { contentDescription = "Selected program: ${it.title} · ${it.startsAt}" }, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                modifier = Modifier.padding(top = 16.dp).semantics { contentDescription = "Selected program: ${it.title} · ${it.startsAt}" }, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val episode = if (it.episodeNumber > 0) "S${it.seasonNumber.toString().padStart(2, '0')}E${it.episodeNumber.toString().padStart(2, '0')} · ${it.episodeTitle}" else ""
             val details = listOf(episode, it.rating, it.airDate).filter { value -> value.isNotBlank() }.joinToString(" · ")
             if (details.isNotBlank()) Text(details, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -3,6 +3,11 @@ package io.github.lynchbros.alreadyon
 import android.graphics.Paint
 import android.text.TextPaint
 import android.text.TextUtils
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,11 +35,13 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** One focus target per channel avoids hundreds of invisible Compose focus/layout nodes on small TVs. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifier, resetSignal: Int = 0, onSelection: (GuideChannel, GuideProgram?) -> Unit = { _, _ -> }, onChannelFocus: (Long, Boolean) -> Unit = { _, _ -> }, onTune: (GuideChannel) -> Unit) {
     val channels = state.channels
     val rows = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    var movingRow by remember { mutableStateOf(false) }
     val targets = remember(channels.map { it.id }) { channels.associate { it.id to FocusRequester() } }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var selectedTime by remember { mutableLongStateOf(now) }
@@ -69,6 +76,12 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                 }
             }
         }
+        // Remote navigation owns scrolling; platform focus scrolling would recenter rows mid-animation.
+        CompositionLocalProvider(LocalBringIntoViewSpec provides remember {
+            object : BringIntoViewSpec {
+                override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = 0f
+            }
+        }) {
         LazyColumn(state = rows, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (channels.isEmpty()) item { Text("No channels are available for this profile.") }
             itemsIndexed(channels, key = { _, channel -> channel.id }) { index, channel ->
@@ -104,10 +117,22 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                                         if (event.key == Key.DirectionUp || event.key == Key.DirectionDown) {
                                             val next = index + if (event.key == Key.DirectionDown) 1 else -1
                                             if (next !in channels.indices) return@onPreviewKeyEvent false
-                                            scope.launch {
-                                                if (rows.layoutInfo.visibleItemsInfo.none { it.index == next && it.offset + it.size <= rows.layoutInfo.viewportEndOffset }) rows.scrollToItem(next)
-                                                withFrameNanos { }
-                                                targets[channels[next].id]?.requestFocus()
+                                            if (!movingRow) scope.launch {
+                                                movingRow = true
+                                                try {
+                                                    // Reveal only the clipped distance, equally in both directions.
+                                                    val layout = rows.layoutInfo
+                                                    val target = layout.visibleItemsInfo.find { it.index == next }
+                                                    val distance = if (target == null) {
+                                                        val current = layout.visibleItemsInfo.find { it.index == index }
+                                                        ((current?.size ?: 0) + layout.mainAxisItemSpacing) * if (next > index) 1f else -1f
+                                                    } else if (target.offset < layout.viewportStartOffset) {
+                                                        (target.offset - layout.viewportStartOffset).toFloat()
+                                                    } else (target.offset + target.size - layout.viewportEndOffset).coerceAtLeast(0).toFloat()
+                                                    if (distance != 0f) rows.animateScrollBy(distance, tween(140))
+                                                    withFrameNanos { }
+                                                    targets[channels[next].id]?.requestFocus()
+                                                } finally { movingRow = false }
                                             }
                                         } else {
                                             val current = selectionIndex()
@@ -163,6 +188,7 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                     }
                 }
             }
+        }
         }
     }
 }
