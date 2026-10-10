@@ -11,10 +11,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +34,13 @@ import java.io.ByteArrayOutputStream
 @Composable
 internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
     val profile = state.profile ?: return
+    val tv = BuildConfig.IS_TV
+    val sections = listOf("Display Name", "Icon", "PIN", "Guide Display", "Audio", "Subtitles")
+    var section by remember { mutableStateOf(sections.first()) }
+    val firstSection = remember { FocusRequester() }
+    val cards = rememberLazyListState()
+    LaunchedEffect(section) { if (tv) cards.scrollToItem(0) }
+    LaunchedEffect(Unit) { if (tv) { withFrameNanos { }; firstSection.requestFocus() } }
     var name by remember(profile.id) { mutableStateOf(profile.name) }
     var icon by remember(profile.id) { mutableStateOf(profile.icon) }
     var upload by remember(profile.id) { mutableStateOf<ByteArray?>(null) }
@@ -76,68 +87,87 @@ internal fun ProfileSettingsScreen(state: PhoneState, model: PhoneModel) {
     }
     val changed = name.trim() != profile.name || icon != profile.icon || upload != null || time != profile.timeFormat ||
         audio != profile.language || subtitles != profile.subtitles || language != profile.subtitleLanguage
-    LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings) { Text("← Back To Guide") } }
-        item { SettingsCard("Display Name") { OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth()) } }
-        item { SettingsCard("Icon") {
-            if (upload == null) ProfileName(profile.copy(name = name, icon = icon), model, avatarSize = 64.dp, showName = false)
-            upload?.let { bytes ->
-                val bitmap = remember(bytes) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
-                Image(bitmap.asImageBitmap(), "Custom icon preview", Modifier.size(64.dp), contentScale = ContentScale.Crop)
-            }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { picker.launch("image/*") }, enabled = !processing) { Text("Upload Custom Icon") }
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { icon = null; upload = null }) { Text("Remove Icon") }
-            }
-            // Wrap presets to the available width so every icon remains visible on phones.
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                avatarPresets.forEach { (id, preset) ->
-                    FilledTonalButton(onClick = { icon = id; upload = null }, contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(48.dp).then(if (icon == id && upload == null) Modifier.border(2.dp, Color(0xff389bea), MaterialTheme.shapes.extraLarge) else Modifier),
-                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(preset.second))) { Text(preset.first) }
+    Column(Modifier.fillMaxSize()) {
+        if (tv) Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Text("Profile Settings", style = MaterialTheme.typography.headlineMedium)
+            Text(profile.name, color = phonePalette.muted)
+        }
+        Row(Modifier.weight(1f)) {
+            // TV keeps category navigation visible while only mounting the selected settings card.
+            if (tv) Column(Modifier.width(190.dp).padding(end = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                sections.forEachIndexed { index, title ->
+                    FilledTonalButton(onClick = { section = title }, modifier = Modifier.fillMaxWidth()
+                        .then(if (index == 0) Modifier.focusRequester(firstSection) else Modifier).tvFocusOutline(),
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = if (section == title) phonePalette.alternate else phonePalette.surface)) {
+                        Text(title)
+                    }
                 }
             }
-        } }
-        item { SettingsCard("PIN") {
-            Text("Status   ${if (profile.hasPin) "PIN Is Set" else "No PIN Set"}")
-            if (editingPin) {
-                OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text("New PIN (4-6 Digits)") },
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword))
-                OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(6) }, label = { Text("Confirm PIN") },
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword))
-                Row {
-                    Button(onClick = { model.savePin(pin); pin = ""; confirm = ""; editingPin = false }, enabled = !state.busy && pin.length in 4..6 && pin == confirm) { Text("Save PIN") }
-                    TextButton(onClick = { editingPin = false; pin = ""; confirm = "" }) { Text("Cancel") }
-                }
-            } else Row(Modifier.horizontalScroll(rememberScrollState())) {
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { editingPin = true; removePin = false }) { Text(if (profile.hasPin) "Change PIN" else "Set PIN") }
-                if (profile.hasPin) OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { if (removePin) { model.savePin(null); removePin = false } else removePin = true }, enabled = !state.busy) { Text(if (removePin) "Confirm remove?" else "Remove PIN") }
+            LazyColumn(Modifier.weight(1f), state = cards, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                item { OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings, modifier = Modifier.tvFocusOutline()) { Text("← Back To Guide") } }
+                if (!tv || section == "Display Name") item { SettingsCard("Display Name") { OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth().tvFocusOutline()) } }
+                if (!tv || section == "Icon") item { SettingsCard("Icon") {
+                    if (upload == null) ProfileName(profile.copy(name = name, icon = icon), model, avatarSize = 64.dp, showName = false)
+                    upload?.let { bytes ->
+                        val bitmap = remember(bytes) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+                        Image(bitmap.asImageBitmap(), "Custom icon preview", Modifier.size(64.dp), contentScale = ContentScale.Crop)
+                    }
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(modifier = Modifier.tvFocusOutline(), shape = MaterialTheme.shapes.small, onClick = { try { picker.launch("image/*") } catch (_: android.content.ActivityNotFoundException) { localError = "No image picker is installed. Upload a custom icon from Profile Settings in the WebUI." } }, enabled = !processing) { Text("Upload Custom Icon") }
+                        OutlinedButton(modifier = Modifier.tvFocusOutline(), shape = MaterialTheme.shapes.small, onClick = { icon = null; upload = null }) { Text("Remove Icon") }
+                    }
+                    // Wrap presets to the available width so every icon remains visible on phones.
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        avatarPresets.forEach { (id, preset) ->
+                            FilledTonalButton(onClick = { icon = id; upload = null }, contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.size(48.dp).tvFocusOutline().then(if (icon == id && upload == null) Modifier.border(2.dp, Color(0xff389bea), MaterialTheme.shapes.extraLarge) else Modifier),
+                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(preset.second))) { Text(preset.first) }
+                        }
+                    }
+                } }
+                if (!tv || section == "PIN") item { SettingsCard("PIN") {
+                    Text("Status   ${if (profile.hasPin) "PIN Is Set" else "No PIN Set"}")
+                    if (editingPin) {
+                        OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text("New PIN (4-6 Digits)") },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword))
+                        OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(6) }, label = { Text("Confirm PIN") },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword))
+                        Row {
+                            Button(modifier = Modifier.tvFocusOutline(), onClick = { model.savePin(pin); pin = ""; confirm = ""; editingPin = false }, enabled = !state.busy && pin.length in 4..6 && pin == confirm) { Text("Save PIN") }
+                            TextButton(modifier = Modifier.tvFocusOutline(), onClick = { editingPin = false; pin = ""; confirm = "" }) { Text("Cancel") }
+                        }
+                    } else Row(Modifier.horizontalScroll(rememberScrollState())) {
+                        OutlinedButton(modifier = Modifier.tvFocusOutline(), shape = MaterialTheme.shapes.small, onClick = { editingPin = true; removePin = false }) { Text(if (profile.hasPin) "Change PIN" else "Set PIN") }
+                        if (profile.hasPin) OutlinedButton(modifier = Modifier.tvFocusOutline(), shape = MaterialTheme.shapes.small, onClick = { if (removePin) { model.savePin(null); removePin = false } else removePin = true }, enabled = !state.busy) { Text(if (removePin) "Confirm remove?" else "Remove PIN") }
+                    }
+                } }
+                if (!tv || section == "Guide Display") item { SettingsCard("Guide Display") { SettingsChoice("Time Format", time, listOf("12h-padded" to "01:00am-02:00am", "12h" to "1:00am-2:00am", "24h" to "22:00-23:00")) { time = it } } }
+                if (!tv || section == "Audio") item { SettingsCard("Audio") { SettingsChoice("Preferred Audio Language", audio, profileLanguages) { audio = it } } }
+                if (!tv || section == "Subtitles") item { SettingsCard("Subtitles") {
+                    SettingsChoice("Subtitles By Default", if (subtitles) "on" else "off", listOf("off" to "Disabled", "on" to "Enabled")) { subtitles = it == "on" }
+                    SettingsChoice("Default Language", language, profileLanguages) { language = it }
+                } }
+                localError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
+                state.notice?.let { item { Text(it) } }
+                item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(modifier = Modifier.tvFocusOutline(), onClick = {
+                        val patch = JSONObject()
+                        if (name.trim() != profile.name) patch.put("name", name.trim())
+                        if (upload == null && icon != profile.icon) patch.put("icon", icon ?: JSONObject.NULL)
+                        if (time != profile.timeFormat) patch.put("guideTimeFormat", time)
+                        if (audio != profile.language) patch.put("audioLanguage", audio)
+                        if (subtitles != profile.subtitles) patch.put("subtitlesEnabled", subtitles)
+                        if (language != profile.subtitleLanguage) patch.put("subtitleLanguage", language)
+                        model.saveProfile(patch, upload)
+                    }, enabled = changed && !state.busy && !processing && name.isNotBlank()) { Text("Save Changes") }
+                    OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings, modifier = Modifier.tvFocusOutline()) { Text("Cancel") }
+                } }
             }
-        } }
-        item { SettingsCard("Guide Display") { SettingsChoice("Time Format", time, listOf("12h-padded" to "01:00am-02:00am", "12h" to "1:00am-2:00am", "24h" to "22:00-23:00")) { time = it } } }
-        item { SettingsCard("Audio") { SettingsChoice("Preferred Audio Language", audio, profileLanguages) { audio = it } } }
-        item { SettingsCard("Subtitles") {
-            SettingsChoice("Subtitles By Default", if (subtitles) "on" else "off", listOf("off" to "Disabled", "on" to "Enabled")) { subtitles = it == "on" }
-            SettingsChoice("Default Language", language, profileLanguages) { language = it }
-        } }
-        localError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        state.notice?.let { item { Text(it) } }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                val patch = JSONObject()
-                if (name.trim() != profile.name) patch.put("name", name.trim())
-                if (upload == null && icon != profile.icon) patch.put("icon", icon ?: JSONObject.NULL)
-                if (time != profile.timeFormat) patch.put("guideTimeFormat", time)
-                if (audio != profile.language) patch.put("audioLanguage", audio)
-                if (subtitles != profile.subtitles) patch.put("subtitlesEnabled", subtitles)
-                if (language != profile.subtitleLanguage) patch.put("subtitleLanguage", language)
-                model.saveProfile(patch, upload)
-            }, enabled = changed && !state.busy && !processing && name.isNotBlank()) { Text("Save Changes") }
-            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = model::closeSettings) { Text("Cancel") }
-        } }
+        }
     }
 }
 
@@ -156,11 +186,13 @@ private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> U
 @Composable
 private fun SettingsChoice(label: String, value: String, options: List<Pair<String, String>>, changed: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val selected = remember { FocusRequester() }
+    LaunchedEffect(open) { if (open && BuildConfig.IS_TV) { withFrameNanos { }; selected.requestFocus() } }
     Text(label, color = phonePalette.muted)
     Box {
-        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { open = true }, modifier = Modifier.fillMaxWidth()) { Text((options.find { it.first == value }?.second ?: value) + " ▾") }
+        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { open = true }, modifier = Modifier.fillMaxWidth().tvFocusOutline()) { Text((options.find { it.first == value }?.second ?: value) + " ▾") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            options.forEach { (code, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { changed(code); open = false }) }
+            options.forEach { (code, name) -> DropdownMenuItem(text = { Text((if (code == value) "✓ " else "") + name) }, modifier = Modifier.then(if (code == value || (options.none { it.first == value } && code == options.first().first)) Modifier.focusRequester(selected) else Modifier).tvFocusOutline(), onClick = { changed(code); open = false }) }
         }
     }
 }

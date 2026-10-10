@@ -59,8 +59,9 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
     }
     LaunchedEffect(state.profile == null) { if (state.profile == null) fullscreen = false }
     LaunchedEffect(fullscreen, controlsVisible) { if (fullscreen && !controlsVisible) focus.requestFocus() }
+    val currentSettings by rememberUpdatedState(state.settings)
     LaunchedEffect(state.profile?.id) {
-        while (state.profile != null) { delay(30_000); model.refreshGuide() }
+        while (state.profile != null) { delay(30_000); if (currentSettings == null) model.refreshGuide() }
     }
     BackHandler(enabled = fullscreen || state.settings != null || state.profile != null) {
         when {
@@ -131,7 +132,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
             // In the guide and sign-in screens, focus belongs to the actionable children.
             }.then(if (fullscreen) Modifier.focusRequester(focus).focusable() else Modifier),
             verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 8.dp)) {
-            if (!fullscreen && (state.profile == null || state.settings != null || state.tvTutorial)) Row(Modifier.fillMaxWidth()) { PhoneBrand() }
+            if (!fullscreen && (state.profile == null || state.tvTutorial)) Row(Modifier.fillMaxWidth()) { PhoneBrand() }
             if (!fullscreen) {
                 if (state.signedIn) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 // Routine background refreshes must not animate or shift the TV layout.
