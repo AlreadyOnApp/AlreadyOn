@@ -450,6 +450,9 @@ func (p *PlaybackHTTP) mediaSource(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, 416, "multiple ranges are not supported")
 		return
 	}
+	// Library bytes are media, never active HTML, even when a malformed file
+	// has an HTML filename or payload. Preserve byte ranges for direct playback.
+	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeContent(&idleWriter{w, http.NewResponseController(w)}, r, info.Name(), info.ModTime(), f)
 }
 

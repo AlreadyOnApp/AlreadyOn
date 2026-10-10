@@ -2,11 +2,13 @@
 
 [![AlreadyOn](../web/public/branding/header-doc.svg)](../README.md)
 
-Release tags identify approved image digests:
+Registry tags identify approved image digests; they are separate from GitHub release tags:
 
 - `nightly` and `YYYY-MM-DD`: development releases.
 - `latest`: an approved test promotion.
 - `stable`: an approved main promotion.
+
+Ordinary dev/test builds create no GitHub releases or Git tags. Approved releases identify a selected source SHA: test promotion creates `YYYY-MM-DD-rcN`, main promotion uses the same date with `-beta`, and later stable approval uses `-stable`. Only RC tags increment; see [release policy](ANDROID_RELEASES.md).
 
 Promotion reuses the tested image; it does not rebuild source under a new tag. Record the source commit and immutable digest before publishing. Mutable tags alone are insufficient to identify a deployed artifact.
 
