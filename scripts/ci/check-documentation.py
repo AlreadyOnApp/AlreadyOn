@@ -43,7 +43,14 @@ def changed_files(base):
 
 
 if __name__ == '__main__':
-    base = os.environ.get('CI_BASE', 'HEAD')
+    base = os.environ.get('CI_BASE')
+    if base is None:
+        # A clean checkout still validates its latest committed change. Using
+        # HEAD silently checked an empty diff after every local commit.
+        parent = subprocess.run(['git', 'rev-parse', '--verify', 'HEAD^'],
+                                capture_output=True, text=True)
+        base = parent.stdout.strip() if parent.returncode == 0 else subprocess.check_output(
+            ['git', 'hash-object', '-t', 'tree', '--stdin'], input='', text=True).strip()
     if not base or set(base) == {'0'}:
         # A new branch has no push.before; compare its fork point with dev.
         result = subprocess.run(['git', 'merge-base', 'HEAD', 'origin/dev'],

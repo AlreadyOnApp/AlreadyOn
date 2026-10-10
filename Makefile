@@ -42,12 +42,21 @@ check-ubuntu-lts:
 image: container-build
 
 # Approved release checks use synthetic data and disposable packaged-runtime storage.
-.PHONY: release-check local-bases refresh-local-bases
+.PHONY: release-check test-go-runtime local-bases refresh-local-bases
 release-check:
 	@test -z "$$(git status --porcelain)" || { echo 'Commit and push build changes before release checks'; exit 1; }
+	@$(MAKE) --no-print-directory lint
+	@python3 scripts/ci/check-documentation.py
+	@python3 scripts/ci/check-syntax.py
+	@go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+	@python3 -m unittest discover -s scripts/ci -p 'test_*.py'
 	@$(MAKE) --no-print-directory image
+	@$(MAKE) --no-print-directory test-go-runtime
 	@$(MAKE) --no-print-directory test-e2e
 	@CONTAINER_ENGINE=podman $(MAKE) --no-print-directory test-container
+
+test-go-runtime:
+	@scripts/test-go-runtime.sh
 
 local-bases:
 	@python3 scripts/local-bases.py

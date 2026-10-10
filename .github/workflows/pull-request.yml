@@ -16,7 +16,7 @@ jobs:
     uses: ./.github/workflows/quality.yml
   tests:
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,10 +25,23 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-      - name: Install media test dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-      - name: Server regression tests
-        working-directory: server
-        run: go test ./...
+      # Use the production recipe: Ubuntu's stock FFmpeg 8.0.x ignores initial burst.
+      # Build locally with a shared cache; untrusted PRs receive no registry credentials.
+      - uses: docker/setup-buildx-action@v4
+      - name: Read shared Ubuntu version
+        id: ubuntu
+        run: echo "version=$(sed -n 's/^ARG UBUNTU_VERSION=//p' deploy/Dockerfile)" >> "$GITHUB_OUTPUT"
+      - name: Build patched media runtime for regression tests
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/base.Dockerfile
+          load: true
+          tags: alreadyon-validation:runtime
+          build-args: |
+            UBUNTU_VERSION=${{ steps.ubuntu.outputs.version }}
+            FFMPEG_BUILD_JOBS=2
+          cache-from: type=gha,scope=source-validation-runtime
+          cache-to: type=gha,mode=max,scope=source-validation-runtime
+      - name: Server regression tests with production media runtime
+        run: CONTAINER_ENGINE=docker scripts/test-go-runtime.sh alreadyon-validation:runtime

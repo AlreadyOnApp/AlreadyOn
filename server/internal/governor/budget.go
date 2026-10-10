@@ -22,7 +22,7 @@ func (g *Governor) runBudget(ctx context.Context) {
 			g.mu.Lock()
 			elapsed := now.Sub(previous)
 			previous = now
-			g.credit = min(time.Duration(float64(budgetInterval)*g.allowance), g.credit+time.Duration(float64(elapsed)*g.allowance))
+			g.refillLocked(elapsed)
 			readable := true
 			for t := range g.tickets {
 				if !g.chargeLocked(t) {
@@ -64,4 +64,10 @@ func WithTicket(ctx context.Context, t *Ticket) context.Context {
 func TicketFrom(ctx context.Context) *Ticket {
 	t, _ := ctx.Value(ticketKey{}).(*Ticket)
 	return t
+}
+
+// Each interval earns allowance CPU-seconds, including multicore allowances.
+// Capping idle credit bounds bursts while negative credit retains unpaid work.
+func (g *Governor) refillLocked(elapsed time.Duration) {
+	g.credit = min(time.Duration(float64(budgetInterval)*g.allowance), g.credit+time.Duration(float64(elapsed)*g.allowance))
 }
