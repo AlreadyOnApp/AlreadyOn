@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -57,8 +58,31 @@ func VerifyAPIKey(ctx context.Context, db *sql.DB, raw string) (int64, User, err
 	err := db.QueryRowContext(ctx, `
 		SELECT k.id, u.id, u.username, u.role, u.disabled, u.must_change_password, u.password_locked, u.max_streams, u.created_at_unix, u.updated_at_unix
 		FROM api_keys k JOIN users u ON u.id = k.user_id
-		WHERE k.key_hash = ? AND u.disabled = 0 AND u.role = 'owner'`, hex.EncodeToString(sum[:])).
+		WHERE k.key_hash = ? AND k.key_prefix <> 'test-key' AND u.disabled = 0 AND u.role = 'owner'`, hex.EncodeToString(sum[:])).
 		Scan(&id, &u.ID, &u.Username, &role, &u.Disabled, &u.MustChangePassword, &u.PasswordLocked, &u.MaxStreams, &u.CreatedAtUnix, &u.UpdatedAtUnix)
+	if errors.Is(err, sql.ErrNoRows) {
+		var hash string
+		id, hash, err = findTestingKey(ctx, db, raw)
+		if err != nil {
+			return 0, User{}, err
+		}
+		if !strings.HasPrefix(hash, "$argon2id$") {
+			upgraded, hashErr := HashPassword(raw)
+			if hashErr != nil {
+				return 0, User{}, hashErr
+			}
+			// A concurrent revocation must never be undone by migration.
+			if _, err = db.ExecContext(ctx, `UPDATE api_keys SET key_hash=? WHERE id=? AND key_hash=? AND key_prefix='test-key'`, upgraded, id, hash); err != nil {
+				return 0, User{}, err
+			}
+			hash = upgraded
+		}
+		err = db.QueryRowContext(ctx, `
+			SELECT k.id, u.id, u.username, u.role, u.disabled, u.must_change_password, u.password_locked, u.max_streams, u.created_at_unix, u.updated_at_unix
+			FROM api_keys k JOIN users u ON u.id=k.user_id
+			WHERE k.id=? AND k.key_hash=? AND k.key_prefix='test-key' AND u.disabled=0 AND u.role='owner'`, id, hash).
+			Scan(&id, &u.ID, &u.Username, &role, &u.Disabled, &u.MustChangePassword, &u.PasswordLocked, &u.MaxStreams, &u.CreatedAtUnix, &u.UpdatedAtUnix)
+	}
 	u.Role = Role(role)
 	return id, u, err
 }

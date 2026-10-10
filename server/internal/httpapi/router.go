@@ -4,9 +4,9 @@ package httpapi
 import (
 	"context"
 	"database/sql"
+	"io/fs"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -222,24 +222,44 @@ func fileExists(path string) bool {
 // each browser's own heuristics, which is exactly the "why is this
 // stale" trap this closes.
 func newSPAFileServer(webDir string) http.Handler {
-	fileServer := http.FileServer(http.Dir(webDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// http.ServeMux already cleans r.URL.Path (rejecting/redirecting
-		// "." and ".." segments) before a handler ever sees it.
-		requested := filepath.Join(webDir, r.URL.Path)
-		if strings.HasPrefix(r.URL.Path, "/assets/") {
-			if info, err := os.Stat(requested); err == nil && !info.IsDir() {
-				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-				fileServer.ServeHTTP(w, r)
+		name := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/"), "/")
+		if name == "" {
+			name = "."
+		}
+		if !fs.ValidPath(name) || strings.ContainsRune(name, '\\') {
+			http.NotFound(w, r)
+			return
+		}
+		// OpenInRoot also prevents symlink escapes and races while resolving
+		// the requested file. Do not stat a joined path outside this boundary.
+		f, err := os.OpenInRoot(webDir, name)
+		if err == nil {
+			info, statErr := f.Stat()
+			if statErr == nil && info.Mode().IsRegular() {
+				defer f.Close()
+				w.Header().Set("Cache-Control", "no-cache")
+				if strings.HasPrefix(r.URL.Path, "/assets/") {
+					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				}
+				http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 				return
 			}
-		} else if info, err := os.Stat(requested); err == nil && !info.IsDir() {
-			w.Header().Set("Cache-Control", "no-cache")
-			fileServer.ServeHTTP(w, r)
+			f.Close()
+		}
+		f, err = os.OpenInRoot(webDir, "index.html")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer f.Close()
+		info, err := f.Stat()
+		if err != nil || !info.Mode().IsRegular() {
+			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
+		http.ServeContent(w, r, "index.html", info.ModTime(), f)
 	})
 }
 

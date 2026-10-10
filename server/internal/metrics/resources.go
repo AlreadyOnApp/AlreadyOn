@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -205,16 +206,24 @@ func memoryUsage(proc, cgroup string, container bool) (memoryReading, bool) {
 			}
 		}
 	}
-	host := int64(values["MemTotal"] * 1024)
+	// Kernel counters are unsigned; check multiplication and conversion before
+	// computing signed byte counts. A corrupt sample is unavailable, not wrapped.
+	var host int64
+	if total := values["MemTotal"]; total <= math.MaxInt64/1024 {
+		host = int64(total * 1024)
+	}
 	if container {
 		limitPath, currentPath, statPath, inactive := "memory.max", "memory.current", "memory.stat", "inactive_file"
 		if _, err := os.Stat(filepath.Join(cgroup, currentPath)); err != nil {
 			limitPath, currentPath, statPath, inactive = "memory/memory.limit_in_bytes", "memory/memory.usage_in_bytes", "memory/memory.stat", "total_inactive_file"
 		}
-		if current, ok := readUint(filepath.Join(cgroup, currentPath)); ok {
-			used := int64(current) - int64(statValue(filepath.Join(cgroup, statPath), inactive))
-			used = max(used, 0)
-			if limit, ok := readUint(filepath.Join(cgroup, limitPath)); ok && limit > 0 && (host == 0 || limit < uint64(host)) {
+		if current, ok := readUint(filepath.Join(cgroup, currentPath)); ok && current <= math.MaxInt64 {
+			cache := statValue(filepath.Join(cgroup, statPath), inactive)
+			var used int64
+			if cache < current {
+				used = int64(current - cache)
+			}
+			if limit, ok := readUint(filepath.Join(cgroup, limitPath)); ok && limit > 0 && limit <= math.MaxInt64 && (host == 0 || limit < uint64(host)) {
 				return memoryReading{used, int64(limit), true}, true
 			}
 			if host > 0 {
@@ -223,7 +232,7 @@ func memoryUsage(proc, cgroup string, container bool) (memoryReading, bool) {
 		}
 	}
 	available, ok := values["MemAvailable"]
-	if host == 0 || !ok {
+	if host == 0 || !ok || available > uint64(host)/1024 {
 		return memoryReading{}, false
 	}
 	return memoryReading{host - int64(available*1024), host, false}, true
