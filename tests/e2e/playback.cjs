@@ -88,9 +88,8 @@ const noWorkers = async (unreleased = () => 0) => {
     const dialog = page.getByRole("dialog");
     await guide.or(dialog).waitFor();
     if (await dialog.count()) {
-      const setup = (await dialog.getByRole("heading").textContent()).includes(
-        "Create",
-      );
+      // Sign-in uses the brand rather than a heading; distinguish dialogs by their accessible name.
+      const setup = (await dialog.getAttribute("aria-label")) === "Create Your AlreadyOn Account";
       const username = dialog.getByLabel("Username");
       const password = dialog.getByLabel("Password", { exact: true });
       assert(
