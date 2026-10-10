@@ -2472,8 +2472,8 @@ const noWorkers = async (unreleased = () => 0) => {
     const headings = await page.locator(".admin-card h3").allTextContents();
     assert(
       JSON.stringify(headings) ===
-        JSON.stringify(["Profiles", "Signed-In Browsers"]),
-      `Admin Settings should show the account form, Profiles, then Signed-In Browsers: ${JSON.stringify(headings)}`,
+        JSON.stringify(["TV Sign-In", "Profiles", "Signed-In Browsers"]),
+      `Admin Settings should show the account form, TV Sign-In, Profiles, then Signed-In Browsers: ${JSON.stringify(headings)}`,
     );
     await page
       .getByRole("columnheader", { name: "Last Active", exact: true })
