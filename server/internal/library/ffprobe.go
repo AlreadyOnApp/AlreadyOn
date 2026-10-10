@@ -216,13 +216,23 @@ func (r rawProbe) toProbeResult() ProbeResult {
 			Default: s.Disposition["default"] == 1, Forced: s.Disposition["forced"] == 1,
 			Profile: s.Profile, Level: s.Level, PixelFormat: s.PixelFormat,
 			FrameRate: parseRate(s.FrameRate), BitRate: parseInt(s.BitRate),
-			SampleRate: int(parseInt(s.SampleRate)), ChannelLayout: s.ChannelLayout,
+			SampleRate: parseSampleRate(s.SampleRate), ChannelLayout: s.ChannelLayout,
 			ColorTransfer:     s.ColorTransfer,
 			SampleAspectRatio: parseRate(strings.ReplaceAll(s.SampleAspectRatio, ":", "/")),
 		})
 	}
 
 	return result
+}
+
+// Parse directly at the native int width so malformed metadata cannot wrap
+// on 32-bit builds. Missing, negative and overflowing rates mean unknown.
+func parseSampleRate(raw string) int {
+	rate, err := strconv.Atoi(raw)
+	if err != nil || rate < 0 {
+		return 0
+	}
+	return rate
 }
 
 func parseRate(s string) float64 {

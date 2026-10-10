@@ -10,6 +10,7 @@ import { watchCapabilities } from '../playback/capabilities';
 import { PasswordInput } from '../components/PasswordInput';
 import { AccountContext, type Account, type AccountRole } from './AccountContext';
 import './AuthGate.css';
+import { safeNext } from './safeNext';
 
 type Phase = 'loading' | 'unreachable' | 'setup' | 'login' | 'change-password' | 'ready';
 
@@ -23,12 +24,6 @@ interface AuthStatus {
 }
 
 const MIN_PASSWORD = 4;
-
-// Only same-origin paths, so a crafted ?next= cannot send anyone elsewhere.
-function safeNext(): string | null {
-  const next = new URLSearchParams(window.location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : null;
-}
 
 async function post(path: string, body: unknown): Promise<{ ok: boolean; message: string }> {
   try {
@@ -83,7 +78,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (phase !== 'ready') return;
-    const next = safeNext();
+    const next = safeNext(window.location.search, window.location.origin);
     if (next) {
       window.location.replace(next);
       return;

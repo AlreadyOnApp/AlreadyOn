@@ -88,18 +88,77 @@ func ProvisionTestAPIKey(ctx context.Context, db *sql.DB, name, raw string) (API
 	if len(raw) < 4 || len(raw) > 128 || strings.ContainsAny(raw, " \t\r\n") {
 		return APIKey{}, errors.New("auth: test key must contain 4 through 128 bytes without whitespace")
 	}
-	sum := sha256.Sum256([]byte(raw))
 	key := APIKey{Name: name, Prefix: "test-key"}
 	owner, err := FirstOwner(ctx, db)
 	if err != nil {
 		return APIKey{}, err
 	}
 	key.UserID, key.Username = owner.ID, owner.Username
-	err = db.QueryRowContext(ctx, `
-		INSERT INTO api_keys (user_id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?)
-		ON CONFLICT(key_hash) DO UPDATE SET user_id=excluded.user_id, name=excluded.name, key_prefix=excluded.key_prefix
-		RETURNING id, created_at_unix`, key.UserID, name, hex.EncodeToString(sum[:]), key.Prefix).Scan(&key.ID, &key.CreatedAtUnix)
-	return key, err
+	// Chosen testing credentials can have little entropy. Unlike generated
+	// 256-bit API keys, they need the same salted, costly hash as passwords.
+	hash, err := HashPassword(raw)
+	if err != nil {
+		return key, err
+	}
+	// Keep lookup and save in one transaction: randomized hashes alone cannot
+	// enforce uniqueness when two local provisioning commands use the same key.
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return key, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM api_keys WHERE key_prefix='test-key' AND key_hash NOT LIKE '$argon2id$%'`); err != nil {
+		return key, err
+	}
+	id, previous, err := findTestingKey(ctx, tx, raw)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return key, err
+	}
+	if id != 0 {
+		err = tx.QueryRowContext(ctx, `UPDATE api_keys SET user_id=?, name=?, key_hash=?, key_prefix='test-key' WHERE id=? AND key_hash=? RETURNING id, created_at_unix`,
+			key.UserID, name, hash, id, previous).Scan(&key.ID, &key.CreatedAtUnix)
+	} else {
+		err = tx.QueryRowContext(ctx, `
+			INSERT INTO api_keys (user_id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?)
+			RETURNING id, created_at_unix`, key.UserID, name, hash, key.Prefix).Scan(&key.ID, &key.CreatedAtUnix)
+	}
+	if err != nil {
+		return key, err
+	}
+	return key, tx.Commit()
+}
+
+type testingKeyQuerier interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+// Testing keys have no public identifier; only explicitly provisioned local
+// Argon2id records are candidates. Argon2 work shares the bounded password pool.
+func findTestingKey(ctx context.Context, db testingKeyQuerier, raw string) (int64, string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT id, key_hash FROM api_keys WHERE key_prefix='test-key' ORDER BY id`)
+	if err != nil {
+		return 0, "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err := ctx.Err(); err != nil {
+			return 0, "", err
+		}
+		var id int64
+		var hash string
+		if err := rows.Scan(&id, &hash); err != nil {
+			return 0, "", err
+		}
+		if strings.HasPrefix(hash, "$argon2id$") {
+			if VerifyPassword(hash, raw) {
+				return id, hash, nil
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, "", err
+	}
+	return 0, "", sql.ErrNoRows
 }
 
 // ListAPIKeys returns every generated key with its owner, newest first —

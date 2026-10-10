@@ -147,6 +147,17 @@ func TestTuneDirectOffsetScopeAndRange(t *testing.T) {
 	if w.Code != 206 || w.Body.String() != "2345" {
 		t.Fatalf("range: %d %q", w.Code, w.Body.String())
 	}
+	// HTML-looking library bytes must remain inert on the media listener, even
+	// when served through both the accounting and idle-deadline wrappers.
+	if err := os.WriteFile(path, []byte("<script>alert(1)</script>"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	r = httptest.NewRequest("GET", result.URL, nil)
+	w = httptest.NewRecorder()
+	media.ServeHTTP(w, r)
+	if w.Code != 200 || w.Header().Get("Content-Type") != "application/octet-stream" || w.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("active media response: %d %v", w.Code, w.Header())
+	}
 	r = httptest.NewRequest("GET", strings.Replace(result.URL, "/999/", "/998/", 1), nil)
 	w = httptest.NewRecorder()
 	media.ServeHTTP(w, r)
