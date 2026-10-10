@@ -41,6 +41,10 @@ def main():
                 return next((n.get('content-desc') for n in node.iter('node') if n.get('content-desc')), '') or ', '.join(n.get('text', '') for n in node.iter('node')).strip(', ')
         return ''
 
+    def selected_program(tree):
+        return next((n.get('content-desc') for n in tree.iter('node')
+                     if n.get('content-desc', '').startswith('Selected program: ')), '')
+
     tree = snapshot()
     if 'CHANNEL' not in texts(tree) or not all(n.get('package', package) == package for n in tree.iter('node')):
         parser.error('Start the selected TV review app in its signed-in guide before running. No login data is modified.')
@@ -51,9 +55,13 @@ def main():
     assert down and down != initial, 'Down must move to another channel'
     key(19)
     assert focused(snapshot()) == initial, 'Up must return to the previous channel'
+    current = selected_program(snapshot())
     key(22)
-    assert focused(snapshot()) == initial, 'Horizontal browsing must retain the channel row'
+    tree = snapshot()
+    assert focused(tree) == initial, 'Horizontal browsing must retain the channel row'
+    assert selected_program(tree) and selected_program(tree) != current, 'Right must update the selected program and details'
     key(21)
+    assert selected_program(snapshot()) == current, 'Left must return to the previous program and details'
     print('PASS: guide arrows', flush=True)
     key(23)
     tree = snapshot()
@@ -108,10 +116,11 @@ def main():
     assert focused(snapshot()) == initial, 'Mini-player Down must restore guide focus'
     key(4)
     key(19)
-    profile = focused(snapshot())
-    assert profile and profile not in ('Pause', 'Mute', 'Settings', initial), 'Mini-player Up must focus profile'
+    assert focused(snapshot()) == 'Switch Profile', 'Mini-player Up must open and focus Switch Profile'
     key(4)
-    assert not any(n.get('package') == package for n in snapshot().iter('node')), 'Back from profile must exit the application'
+    assert focused(snapshot()) == 'Pause', 'Profile-menu Back must restore mini-player focus'
+    key(4)
+    assert not any(n.get('package') == package for n in snapshot().iter('node')), 'Mini-player Back must exit the application'
     # Force-stop tests process death, preserving Keystore cookies and profile preferences.
     run('shell', 'am', 'force-stop', package)
     run('shell', 'am', 'start', '-n', f'{package}/io.github.lynchbros.alreadyon.MainActivity')

@@ -151,7 +151,9 @@ class TvNavigationTest {
             device.pressBack() // Focus the mini-player.
             compose.waitUntil(10000) { controlFocused("Pause") }
             device.pressDPadUp()
-            compose.waitUntil(10000) { compose.onAllNodes(hasText("Admin") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Switch Profile") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            device.pressBack()
+            compose.waitUntil(10000) { controlFocused("Pause") }
             device.takeScreenshot(java.io.File(instrumentation.targetContext.getExternalFilesDir(null), "tv-guide.png"))
             device.pressBack() // Exit from profile/player without signing out.
             compose.waitUntil(10000) { compose.activity.isFinishing }

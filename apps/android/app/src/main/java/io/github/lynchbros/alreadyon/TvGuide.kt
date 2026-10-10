@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -30,7 +31,7 @@ import java.util.Locale
 
 /** One focus target per channel avoids hundreds of invisible Compose focus/layout nodes on small TVs. */
 @Composable
-internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifier, resetSignal: Int = 0, onChannelFocus: (Long, Boolean) -> Unit = { _, _ -> }, onTune: (GuideChannel) -> Unit) {
+internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifier, resetSignal: Int = 0, onSelection: (GuideChannel, GuideProgram?) -> Unit = { _, _ -> }, onChannelFocus: (Long, Boolean) -> Unit = { _, _ -> }, onTune: (GuideChannel) -> Unit) {
     val channels = state.channels
     val rows = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -47,6 +48,9 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
         if (channels.isNotEmpty()) {
             val index = channels.indexOfFirst { it.id == state.channel?.id }.coerceAtLeast(0)
             selectedTime = System.currentTimeMillis(); origin = selectedTime / 1_800_000 * 1_800_000
+            val channel = channels[index]
+            onSelection(channel, channel.programs.find { selectedTime >= Instant.parse(it.startsAt).toEpochMilli() && selectedTime < Instant.parse(it.endsAt).toEpochMilli() }
+                ?: channel.programs.firstOrNull())
             rows.scrollToItem(index)
             withFrameNanos { }
             targets[channels[index].id]?.requestFocus()
@@ -74,17 +78,25 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                 } }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val windowMs = ((maxWidth.value - 100) / 4 * 60_000).toLong()
-                    fun reportFocus() {
-                        val current = programs.find { System.currentTimeMillis() >= it.second && System.currentTimeMillis() < it.third }
-                        onChannelFocus(channel.id, current != null && selectedTime >= current.second && selectedTime < current.third)
+                    fun selectionIndex(at: Long = selectedTime): Int = programs.indexOfFirst { at >= it.second && at < it.third }
+                        .takeIf { it >= 0 } ?: programs.indexOfFirst { it.second >= at }.takeIf { it >= 0 } ?: programs.lastIndex
+                    fun reveal(start: Long, end: Long) {
+                        // Scroll only when the cell is outside the viewport; headers always retain half-hour boundaries.
+                        if (end <= origin || start >= origin + windowMs) origin = start / 1_800_000 * 1_800_000
                     }
-                    fun reveal(start: Long) {
-                        if (start < origin) origin = start / 1_800_000 * 1_800_000
-                        else if (start >= origin + windowMs) origin = start / 1_800_000 * 1_800_000
+                    fun reportFocus() {
+                        val chosen = programs.getOrNull(selectionIndex())
+                        if (chosen != null) {
+                            selectedTime = selectedTime.coerceIn(chosen.second, (chosen.third - 1).coerceAtLeast(chosen.second))
+                            reveal(chosen.second, chosen.third)
+                        }
+                        val current = chosen != null && chosen == programs.getOrNull(selectionIndex(System.currentTimeMillis()))
+                        onChannelFocus(channel.id, current)
+                        onSelection(channel, chosen?.first)
                     }
                     Box(Modifier.fillMaxWidth().height(72.dp).focusRequester(targets.getValue(channel.id))
                             .onFocusChanged { focused = it.hasFocus; if (it.isFocused) reportFocus() }
-                            .semantics(mergeDescendants = true) { contentDescription = "Channel ${channel.number}: ${channel.name}" }
+                            .semantics(mergeDescendants = true) { contentDescription = "Channel ${channel.number}: ${channel.name}"; stateDescription = programs.getOrNull(selectionIndex())?.let { "${it.first.title} · ${it.first.startsAt}" }.orEmpty() }
                             .onPreviewKeyEvent { event ->
                                 if (event.key !in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) false
                                 else {
@@ -98,9 +110,9 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                                                 targets[channels[next].id]?.requestFocus()
                                             }
                                         } else {
-                                            val current = programs.indexOfFirst { selectedTime >= it.second && selectedTime < it.third }.coerceAtLeast(0)
+                                            val current = selectionIndex()
                                             val next = current + if (event.key == Key.DirectionRight) 1 else -1
-                                            programs.getOrNull(next)?.let { selectedTime = it.second + 1; reveal(it.second); reportFocus() }
+                                            programs.getOrNull(next)?.let { selectedTime = it.second; reportFocus() }
                                         }
                                     }
                                     true
@@ -112,19 +124,17 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                                 Text(channel.name, maxLines = 2, style = MaterialTheme.typography.bodySmall)
                             }
                             val labelPaint = remember { TextPaint(Paint.ANTI_ALIAS_FLAG) }
-                            Canvas(Modifier.weight(1f).fillMaxHeight()) {
+                            Box(Modifier.weight(1f).fillMaxHeight()) {
+                            Canvas(Modifier.fillMaxSize()) {
                                 val scale = 4.dp.toPx() / 60_000
                                 val gap = 3.dp.toPx()
-                                var selected = programs.indexOfFirst { selectedTime >= it.second && selectedTime < it.third }
-                                if (selected < 0) selected = programs.indexOfFirst { it.second >= selectedTime }.let { if (it < 0) programs.lastIndex else it }
-                                programs.forEachIndexed { programIndex, (program, start, end) ->
+                                programs.forEach { (program, start, end) ->
                                     val left = ((start - origin) * scale).coerceAtLeast(0f) + gap
                                     val right = ((end - origin) * scale).coerceAtMost(size.width)
-                                    if (right <= left) return@forEachIndexed
+                                    if (right <= left) return@forEach
                                     val current = now >= start && now < end
                                     val fill = if (current) palette.now else palette.surface
                                     drawRoundRect(fill, androidx.compose.ui.geometry.Offset(left, 0f), androidx.compose.ui.geometry.Size(right-left, size.height), androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()))
-                                    if (focused && programIndex == selected) drawRoundRect(Color.White, androidx.compose.ui.geometry.Offset(left+2, 2f), androidx.compose.ui.geometry.Size((right-left-4).coerceAtLeast(0f), size.height-4), androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
                                     labelPaint.color = (if (current) palette.nowText else palette.text).toArgb()
                                     val available = (right-left-8.dp.toPx()).coerceAtLeast(0f)
                                     labelPaint.textSize = 11.dp.toPx()
@@ -135,6 +145,19 @@ internal fun TvGuide(state: PhoneState, palette: PhonePalette, modifier: Modifie
                                         canvas.nativeCanvas.drawText(TextUtils.ellipsize(program.title, labelPaint, available, TextUtils.TruncateAt.END).toString(), left+4.dp.toPx(), 39.dp.toPx(), labelPaint)
                                     }
                                 }
+                            }
+                            // Keep the hot remote-focus draw separate from the cached program labels.
+                            Canvas(Modifier.fillMaxSize()) {
+                                val scale = 4.dp.toPx() / 60_000
+                                val selected = selectionIndex()
+                                if (focused) programs.getOrNull(selected)?.let { (_, start, end) ->
+                                    val left = ((start - origin) * scale).coerceIn(0f, (size.width - 12.dp.toPx()).coerceAtLeast(0f))
+                                    val width = (((end - origin) * scale).coerceAtMost(size.width) - left).coerceAtLeast(12.dp.toPx())
+                                    drawRoundRect(Color.White, androidx.compose.ui.geometry.Offset(left + 2, 2f),
+                                        androidx.compose.ui.geometry.Size((width - 4).coerceAtLeast(0f), size.height - 4),
+                                        androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+                                }
+                            }
                             }
                         }
                     }

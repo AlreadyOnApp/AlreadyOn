@@ -20,6 +20,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 
 /** TV navigation is fixed-position presentation; tuning never rotates or remounts the shell. */
 @Composable
@@ -30,6 +34,9 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
     var region by remember { mutableStateOf("guide") }
     var guideOnCurrent by remember { mutableStateOf(true) }
     var guideReset by remember { mutableIntStateOf(0) }
+    var profileOpenSignal by remember { mutableIntStateOf(0) }
+    val selection = remember { mutableStateOf<Pair<GuideChannel, GuideProgram?>?>(null) }
+    val scope = rememberCoroutineScope()
     val profileFocus = remember { FocusRequester() }
     val activity = LocalContext.current as? Activity
     fun returnToGuide() { region = "guide"; guideOnCurrent = true; guideReset++ }
@@ -84,7 +91,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                         }
                         Key.DirectionUp, Key.DirectionDown -> if (region == "player") {
                             if (event.type == KeyEventType.KeyDown) {
-                                if (event.key == Key.DirectionUp) { region = "profile"; profileFocus.requestFocus() }
+                                if (event.key == Key.DirectionUp) { region = "profile"; profileFocus.requestFocus(); profileOpenSignal++ }
                                 else returnToGuide()
                             }
                             return@onPreviewKeyEvent true
@@ -126,11 +133,14 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
             if (!fullscreen) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 PhoneBrand()
-                if (state.profile != null && !state.tvTutorial) ProfileMenu(state, model, Modifier.focusRequester(profileFocus).onFocusChanged { if (it.isFocused) region = "profile" })
+                if (state.profile != null && !state.tvTutorial) ProfileMenu(state, model, Modifier.focusRequester(profileFocus).onFocusChanged { if (it.isFocused) region = "profile" },
+                    openSignal = profileOpenSignal, onMenuDismiss = {
+                        scope.launch { withFrameNanos { }; region = "player"; controlsSignal++ }
+                    })
             }
             if (!fullscreen) {
                 if (state.signedIn) state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                // Routine background refreshes must not animate or shift the TV layout.
             }
             when {
                 !state.signedIn -> ServerConnectScreen(state, model, Modifier.weight(1f))
@@ -149,22 +159,37 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                                 fullscreen = fullscreen, tv = true, tvActive = fullscreen || region == "player", controlsSignal = controlsSignal,
                                 onControlsVisibility = { controlsVisible = it }, onFullscreen = { if (!fullscreen) model.unmute(); fullscreen = !fullscreen; if (fullscreen) controlsSignal++ else returnToGuide() },
                                 onExitFullscreen = { fullscreen = false; returnToGuide() })
-                            if (!fullscreen) Column(Modifier.weight(1f).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("${state.channel.number} · ${state.channel.name}", style = MaterialTheme.typography.titleLarge)
-                                state.playback?.let { playback ->
-                                    if (playback.seriesTitle.isNotBlank()) Text(playback.seriesTitle, style = MaterialTheme.typography.titleMedium)
-                                    Text(playback.episodeLabel + playback.title, style = MaterialTheme.typography.titleMedium)
-                                }
-                            }
+                            if (!fullscreen) TvGuideDetails(selection, state.channel, palette, Modifier.weight(1f))
                         }
                     }
                     if (!fullscreen) TvGuide(state, palette, Modifier.weight(1f), resetSignal = guideReset,
+                        onSelection = { channel, program -> selection.value = channel to program },
                         onChannelFocus = { id, current -> region = "guide"; guideOnCurrent = id == state.channel?.id && current }) { channel ->
                         model.unmute(); model.watch(channel); fullscreen = true; controlsSignal++
                     }
                 }
             }
         }
+        }
+    }
+}
+
+
+/** Read selection only here so each arrow does not recompose the player and shell. */
+@Composable
+private fun TvGuideDetails(selection: State<Pair<GuideChannel, GuideProgram?>?>, fallback: GuideChannel,
+    palette: PhonePalette, modifier: Modifier) {
+    Column(modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val channel = selection.value?.first ?: fallback
+        val program = selection.value?.second
+        Text("${channel.number} · ${channel.name}", style = MaterialTheme.typography.titleLarge, maxLines = 1)
+        program?.let {
+            Text(it.title + (if (it.year > 0) " (${it.year})" else ""), style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { contentDescription = "Selected program: ${it.title} · ${it.startsAt}" }, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val episode = if (it.episodeNumber > 0) "S${it.seasonNumber.toString().padStart(2, '0')}E${it.episodeNumber.toString().padStart(2, '0')} · ${it.episodeTitle}" else ""
+            val details = listOf(episode, it.rating, it.airDate).filter { value -> value.isNotBlank() }.joinToString(" · ")
+            if (details.isNotBlank()) Text(details, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (it.overview.isNotBlank()) Text(it.overview, color = palette.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }

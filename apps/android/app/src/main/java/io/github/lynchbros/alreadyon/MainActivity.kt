@@ -184,12 +184,19 @@ class MainActivity : ComponentActivity() {
 
 /** Profile administration is separate from the account's Owner authorization. */
 @Composable
-internal fun ProfileMenu(state: PhoneState, model: PhoneModel, modifier: Modifier = Modifier) {
+internal fun ProfileMenu(state: PhoneState, model: PhoneModel, modifier: Modifier = Modifier, openSignal: Int = 0, onMenuDismiss: () -> Unit = {}) {
     var open by remember { mutableStateOf(false) }
+    var consumedSignal by remember { mutableIntStateOf(openSignal) }
+    val switchFocus = remember { FocusRequester() }
+    LaunchedEffect(openSignal) {
+        if (openSignal > consumedSignal) open = true
+        consumedSignal = openSignal
+    }
+    LaunchedEffect(open) { if (open && BuildConfig.IS_TV) { withFrameNanos { }; switchFocus.requestFocus() } }
     Box {
         TextButton(onClick = { open = true }, modifier = modifier) { ProfileName(state.profile!!, model) }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("Switch Profile") }, onClick = { open = false; model.changeProfile() })
+        DropdownMenu(expanded = open, onDismissRequest = { open = false; onMenuDismiss() }) {
+            DropdownMenuItem(text = { Text("Switch Profile") }, modifier = Modifier.focusRequester(switchFocus).tvFocusOutline(), onClick = { open = false; model.changeProfile() })
             if (!BuildConfig.IS_TV) DropdownMenuItem(text = { Text("Profile Settings") }, onClick = { open = false; model.openSettings("profile") })
             DropdownMenuItem(text = { Text("Sign Out") }, onClick = { open = false; model.logout() })
         }
