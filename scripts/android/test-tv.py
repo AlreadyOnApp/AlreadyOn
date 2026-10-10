@@ -47,8 +47,9 @@ def main():
             f"-X github.com/lynchbros/alreadyon/server/internal/config.webDir={ROOT / 'web/dist'}",
             "./cmd/server", cwd=ROOT / "server")
         with socket.socket() as sock:
-            sock.bind(("127.0.0.1", 0))
-            port = sock.getsockname()[1]
+            # Fail if occupied; never replace a live service for the fixture.
+            sock.bind(("127.0.0.1", 19900))
+            port = 19900
         with (root / "server.log").open("w") as log:
             process = subprocess.Popen([str(binary)], cwd=root,
                 env=dict(os.environ, ALREADYON_WEB_PORT=str(port)), stdout=log, stderr=log)
