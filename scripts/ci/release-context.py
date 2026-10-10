@@ -96,10 +96,12 @@ def update_source_tag(repository, day, revision):
     if stable:
         raise ValueError(f'{day} is stable; its source tag is immutable')
     current = remote_ref(repository, f'tags/{day}')
+    if current == revision:
+        return revision
     if current:
         if not subprocess.run(['git', 'merge-base', '--is-ancestor', current, revision], check=False).returncode == 0:
             raise ValueError('New release source must descend from the existing date tag')
-        payload = json.dumps({'sha': revision, 'force': True})
+        payload = json.dumps({'sha': revision, 'force': False})
         subprocess.run(['gh', 'api', '--method', 'PATCH', f'repos/{repository}/git/refs/tags/{day}',
                         '--input', '-'], input=payload, text=True, check=True, stdout=subprocess.DEVNULL)
     else:

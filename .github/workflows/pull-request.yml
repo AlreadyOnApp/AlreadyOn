@@ -1,5 +1,5 @@
-# Untrusted changes receive a read-only token and no publishing credentials.
-name: Source Validation
+# Date-release dev PRs run full source and browser e2e validation.
+name: Date Release PR Validation
 on:
   push:
     branches: [dev]
@@ -50,7 +50,7 @@ jobs:
             --target ci-base \
             --build-arg RUNTIME_BASE=alreadyon-validation:runtime \
             --tag alreadyon-validation:ci .
-      - name: Go regression and full browser e2e tests
+      - name: Go regressions and full browser e2e tests
         uses: ./.github/actions/test-source
         with:
           ci-base: alreadyon-validation:ci
