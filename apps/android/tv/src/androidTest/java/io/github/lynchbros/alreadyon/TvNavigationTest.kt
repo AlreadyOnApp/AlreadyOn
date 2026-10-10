@@ -76,7 +76,16 @@ class TvNavigationTest {
                 click("Check Server")
             } else {
                 compose.waitUntil(60000) { compose.onAllNodes(hasText("AlreadyOn TV fixture ·", substring = true)).fetchSemanticsNodes().isNotEmpty() }
-                compose.onAllNodes(hasText("AlreadyOn TV fixture ·", substring = true)).onFirst().performClick()
+                val server = hasText("AlreadyOn TV fixture ·", substring = true)
+                // Real remote events catch parent focus targets that swallow navigation.
+                repeat(8) {
+                    if (compose.onAllNodes(server and isFocused()).fetchSemanticsNodes().isEmpty()) {
+                        device.pressDPadDown()
+                        compose.waitForIdle()
+                    }
+                }
+                compose.onAllNodes(server).onFirst().assertIsFocused()
+                device.pressDPadCenter()
             }
             compose.waitUntil(60000) { exists("Username") }
             assertFalse("Server fingerprint confirmation is skipped", exists("Confirm Server"))

@@ -68,7 +68,10 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
                     }
                     else -> false
                 }
-            }.focusRequester(focus).focusable(), verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 12.dp)) {
+            // Only fullscreen needs a focus target to receive remote keys with hidden controls.
+            // In the guide and sign-in screens, focus belongs to the actionable children.
+            }.then(if (fullscreen) Modifier.focusRequester(focus).focusable() else Modifier),
+            verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 12.dp)) {
             if (!fullscreen) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 PhoneBrand(onHome = model::closeSettings)
