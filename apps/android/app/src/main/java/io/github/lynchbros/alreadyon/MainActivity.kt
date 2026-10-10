@@ -1,6 +1,5 @@
 package io.github.lynchbros.alreadyon
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
@@ -145,10 +144,10 @@ class MainActivity : ComponentActivity() {
                             color = palette.surface, shape = MaterialTheme.shapes.medium) {
                             if (state.profile != null) Row(Modifier.fillMaxWidth().padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                PhoneBrand(onHome = model::closeSettings)
+                                PhoneBrand()
                                 ProfileMenu(state, model)
                             } else Column(Modifier.fillMaxWidth().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                PhoneBrand(onHome = model::closeSettings)
+                                PhoneBrand()
                                 if (choosingProfile) Text("Who’s Watching?", style = MaterialTheme.typography.headlineMedium)
                             }
                         }
@@ -191,7 +190,7 @@ internal fun ProfileMenu(state: PhoneState, model: PhoneModel) {
         TextButton(onClick = { open = true }) { ProfileName(state.profile!!, model) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text("Switch Profile") }, onClick = { open = false; model.changeProfile() })
-            DropdownMenuItem(text = { Text("Profile Settings") }, onClick = { open = false; model.openSettings("profile") })
+            if (!BuildConfig.IS_TV) DropdownMenuItem(text = { Text("Profile Settings") }, onClick = { open = false; model.openSettings("profile") })
             DropdownMenuItem(text = { Text("Sign Out") }, onClick = { open = false; model.logout() })
         }
     }
@@ -291,6 +290,22 @@ internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePa
     LaunchedEffect(Unit) {
         while (true) { now = System.currentTimeMillis(); delay(30_000) }
     }
+    val currentProgramFocus = remember { FocusRequester() }
+    val focusChannel = channels.firstOrNull { it.id == state.channel?.id }
+        ?: channels.firstOrNull { channel -> channel.programs.any {
+            Instant.parse(it.startsAt).toEpochMilli() <= now && Instant.parse(it.endsAt).toEpochMilli() > now
+        } }
+    val focusProgram = focusChannel?.programs?.firstOrNull {
+        Instant.parse(it.startsAt).toEpochMilli() <= now && Instant.parse(it.endsAt).toEpochMilli() > now
+    }
+    LaunchedEffect(focusChannel?.id, focusProgram?.startsAt) {
+        if (focusChannel != null && focusProgram != null) {
+            rows.scrollToItem(channels.indexOf(focusChannel))
+            scroll.scrollTo(0)
+            withFrameNanos { } // Allow a lazily composed airing to attach its focus target.
+            currentProgramFocus.requestFocus()
+        }
+    }
     val localNow = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
     val origin = localNow.withMinute(localNow.minute / 30 * 30).withSecond(0).withNano(0)
         .toInstant().toEpochMilli()
@@ -324,8 +339,10 @@ internal fun ChannelGuide(state: PhoneState, model: PhoneModel, palette: PhonePa
                                 val block = ((end.coerceAtMost(origin + 12 * 60 * 60_000L) - begin.coerceAtLeast(origin)) / 60_000f * minutesToDp).coerceAtLeast(0f).dp
                                 if (block.value > 0) {
                                     val current = begin <= now && end > now
-                                    Surface(onClick = { onTune(channel) }, modifier = Modifier.offset(x = left).width(block).fillMaxHeight().padding(start = 3.dp).tvFocusOutline()
-                                            .then(if (current && channel.id == state.channel?.id) Modifier.border(2.dp, Color.Red, MaterialTheme.shapes.small) else Modifier),
+                                    Surface(onClick = { onTune(channel) }, modifier = Modifier.offset(x = left).width(block).fillMaxHeight().padding(start = 3.dp)
+                                            .then(if (channel.id == focusChannel?.id && program == focusProgram) Modifier.focusRequester(currentProgramFocus) else Modifier)
+                                            .tvFocusOutline()
+                                            .then(if (current && channel.id == focusChannel?.id) Modifier.border(2.dp, Color.Red, MaterialTheme.shapes.small) else Modifier),
                                         color = if (current) palette.now else palette.surface, shape = MaterialTheme.shapes.small) {
                                         Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Text(if (current) "Now · ${format.format(Instant.ofEpochMilli(end))}" else format.format(Instant.ofEpochMilli(begin)),
@@ -361,11 +378,11 @@ internal fun isLoopback(host: String): Boolean {
 
 // Keep the app wordmark and launcher icon on the shared, font-free brand paths.
 @Composable
-internal fun PhoneBrand(onHome: () -> Unit) {
+internal fun PhoneBrand() {
     // Wordmark visible height is 88/601 of its width; icon padding is 80/108.
     val wordmarkHeight = 170.dp * (88f / 601f)
     val iconSize = wordmarkHeight * 1.05f * (108f / 80f)
-    Column(Modifier.clickable(onClickLabel = "AlreadyOn home", onClick = onHome)) {
+    Column {
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Image(painterResource(R.drawable.ic_brand), contentDescription = null,

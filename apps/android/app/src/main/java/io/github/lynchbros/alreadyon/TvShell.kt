@@ -74,7 +74,7 @@ internal fun TvShell(state: PhoneState, model: PhoneModel) {
             verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 12.dp)) {
             if (!fullscreen) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
-                PhoneBrand(onHome = model::closeSettings)
+                PhoneBrand()
                 if (state.profile != null) ProfileMenu(state, model)
             }
             if (!fullscreen) {

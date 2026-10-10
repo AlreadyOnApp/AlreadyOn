@@ -75,6 +75,8 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    val usernameFocus = remember { FocusRequester() }
+    LaunchedEffect(trust) { if (trust != null) usernameFocus.requestFocus() }
     val pinFocus = remember { FocusRequester() }
     val connectFocus = remember { FocusRequester() }
     var pinKeypad by remember { mutableStateOf(false) }
@@ -141,7 +143,7 @@ internal fun ServerConnectScreen(state: PhoneState, model: PhoneModel, modifier:
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = if (BuildConfig.IS_TV) ImeAction.Next else ImeAction.Default),
                     keyboardActions = KeyboardActions(onNext = { if (BuildConfig.IS_TV) enterPin() }, onDone = { if (BuildConfig.IS_TV) enterPin() }),
-                    modifier = Modifier.fillMaxWidth(if (BuildConfig.IS_TV) 0.6f else 1f).onPreviewKeyEvent {
+                    modifier = Modifier.fillMaxWidth(if (BuildConfig.IS_TV) 0.6f else 1f).focusRequester(usernameFocus).onPreviewKeyEvent {
                         if (BuildConfig.IS_TV && (it.key == Key.Enter || it.key == Key.NumPadEnter)) {
                             if (it.type == KeyEventType.KeyUp) enterPin()
                             true
