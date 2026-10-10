@@ -62,6 +62,7 @@ class TvNavigationTest {
                 setPort(bridge.localPort)
             }, NsdManager.PROTOCOL_DNS_SD, listener)
             if (!manual) assertTrue("Fixture discovery registration", registered.await(10, TimeUnit.SECONDS))
+            compose.onAllNodes(hasClickAction() and (hasContentDescription("AlreadyOn") or hasAnyDescendant(hasContentDescription("AlreadyOn")))).assertCountEquals(0)
             fun exists(text: String) = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
             fun click(text: String) {
                 compose.waitUntil(60000) { exists(text) }
@@ -91,6 +92,7 @@ class TvNavigationTest {
                 device.pressDPadCenter()
             }
             compose.waitUntil(60000) { exists("Username") }
+            compose.onNode(hasSetTextAction() and hasText("Username")).assertIsFocused()
             assertFalse("Server fingerprint confirmation is skipped", exists("Confirm Server"))
             compose.onNode(hasSetTextAction() and hasText("Username")).performTextInput("tv-fixture")
             compose.onNode(hasSetTextAction() and hasText("Username")).performImeAction()
@@ -106,6 +108,12 @@ class TvNavigationTest {
             compose.waitUntil(10000) { exists("CHANNEL") }
             assertTrue("Compact guide on first entry", exists("CHANNEL"))
             assertTrue("Guide channel 110", exists("110"))
+            compose.waitUntil(10000) { compose.onAllNodes(hasText("Now ·", substring = true) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Admin").performClick()
+            compose.onNodeWithText("Switch Profile").assertExists()
+            compose.onNodeWithText("Sign Out").assertExists()
+            compose.onNodeWithText("Profile Settings").assertDoesNotExist()
+            device.pressBack()
             val model = ViewModelProvider(compose.activity)[PhoneModel::class.java]
             compose.runOnIdle { model.setQuality(720); model.setSubtitle(null) }
             val muted = model.state.value.muted
