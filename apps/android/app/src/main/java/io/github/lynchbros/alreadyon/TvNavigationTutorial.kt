@@ -9,7 +9,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 
-/** Static onboarding has no animation, image assets, timers or background playback. */
+// Static onboarding has no animation, image assets, timers or background playback.
 @Composable
 internal fun TvNavigationTutorial(modifier: Modifier, onContinue: () -> Unit) {
     val focus = remember { FocusRequester() }

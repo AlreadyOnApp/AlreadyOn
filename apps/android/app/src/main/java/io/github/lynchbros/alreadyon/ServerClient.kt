@@ -136,11 +136,23 @@ internal class ServerClient(val origin: String, store: SessionStore, bypassTls: 
         List(data.length()) { index ->
             val c = data.getJSONObject(index)
             val programs = c.getJSONArray("programs")
-            GuideChannel(c.getLong("channelId"), c.getInt("number"), c.getString("name"),
-                List(programs.length()) { i ->
-                    val p = programs.getJSONObject(i)
-                    GuideProgram(guideTitle(if (p.optString("mediaType") == "movie") p.getString("title") else p.optString("seriesTitle").takeUnless { it.isBlank() || it == "null" } ?: p.getString("title")), p.getString("startsAt"), p.getString("endsAt"))
-                })
+            val visible = List(programs.length()) { programs.getJSONObject(it) }
+                .filter { !BuildConfig.IS_TV || it.optString("kind") != "commercial" }.map { p ->
+                    GuideProgram(guideTitle(if (p.optString("mediaType") == "movie") p.getString("title") else p.optString("seriesTitle").takeUnless { it.isBlank() || it == "null" } ?: p.getString("title")), p.getString("startsAt"), p.getString("endsAt"),
+                        episodeTitle = guideTitle(p.optString("title")), seasonNumber = p.optInt("seasonNumber"), episodeNumber = p.optInt("episodeNumber"),
+                        overview = p.optString("overview"), year = p.optInt("year"), rating = p.optString("contentRating"), airDate = p.optString("airDate"),
+                        mediaFileId = p.optLong("mediaFileId", -1), sourceOffset = p.optDouble("sourceOffsetSeconds"))
+                }
+            // An interrupted show is one guide stop; a fresh airing of the same file remains separate.
+            val cells = if (!BuildConfig.IS_TV) visible else buildList {
+                visible.forEach { program ->
+                    val previous = lastOrNull()
+                    if (previous != null && program.mediaFileId >= 0 && previous.mediaFileId == program.mediaFileId && program.sourceOffset > 0) {
+                        set(lastIndex, previous.copy(endsAt = program.endsAt))
+                    } else add(program)
+                }
+            }
+            GuideChannel(c.getLong("channelId"), c.getInt("number"), c.getString("name"), cells)
         }.sortedBy { it.number }
     }
 
@@ -174,7 +186,10 @@ internal class ServerClient(val origin: String, store: SessionStore, bypassTls: 
 
 internal data class ViewerProfile(val id: Long, val name: String, val tier: String, val hasPin: Boolean, val language: String, val icon: String?, val role: String = "viewer",
     val lastChannel: Long = -1, val timeFormat: String = "12h", val subtitles: Boolean = false, val subtitleLanguage: String = "en")
-internal data class GuideProgram(val title: String, val startsAt: String, val endsAt: String)
+internal data class GuideProgram(val title: String, val startsAt: String, val endsAt: String,
+    val episodeTitle: String = "", val seasonNumber: Int = 0, val episodeNumber: Int = 0,
+    val overview: String = "", val year: Int = 0, val rating: String = "", val airDate: String = "",
+    val mediaFileId: Long = -1, val sourceOffset: Double = 0.0)
 internal data class GuideChannel(val id: Long, val number: Int, val name: String, val programs: List<GuideProgram>)
 
 /** Match web display cleanup without changing server metadata or source filenames. */
