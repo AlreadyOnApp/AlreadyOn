@@ -2,7 +2,7 @@
 
 [![AlreadyOn](web/public/branding/header-doc.svg)](README.md)
 
-Start with [the project brief](docs/PROJECT_BRIEF.md) and [development setup](docs/DEVELOPMENT.md). Discuss substantial changes in an issue before implementation. Assistants must also read [AGENTS.md](AGENTS.md).
+Start with [the project brief](docs/PROJECT_BRIEF.md) and [development setup](docs/DEVELOPMENT.md). Use this repository’s issues for tester/user feedback; maintainers track development work separately. Coordinate substantial implementation changes with maintainers before starting. Assistants must also read [AGENTS.md](AGENTS.md).
 
 ## Make a change
 
