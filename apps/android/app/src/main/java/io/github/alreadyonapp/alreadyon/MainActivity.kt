@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val model: PhoneModel = viewModel()
             val state by model.state.collectAsStateWithLifecycle()
+            PhoneTheme { UpdatePrompt(visible = !pip) }
             StartupPreload {
                 if (BuildConfig.IS_TV) {
                     TvShell(state, model)

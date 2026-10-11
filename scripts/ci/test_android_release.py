@@ -21,6 +21,24 @@ class AndroidReleaseTests(unittest.TestCase):
                 patch.object(release, "changelog", return_value="## Features\n\n- Synthetic feature."):
             release.candidate("owner/repo", tag, "a" * 40, 200000000, directory)
 
+    def test_candidate_identifies_phone_and_tv_update_assets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            self.fixture(directory)
+            manifest = release.verify_assets(directory)
+            self.assertEqual(manifest["artifacts"]["phone"], {"file": release.ASSETS[0], "sha256": release.digest(directory / release.ASSETS[0])})
+            self.assertEqual(manifest["artifacts"]["tv"], {"file": release.ASSETS[3], "sha256": release.digest(directory / release.ASSETS[3])})
+
+    def test_cross_target_metadata_cannot_be_promoted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            self.fixture(directory)
+            manifest = json.loads((directory / "android-release.json").read_text())
+            manifest["artifacts"]["tv"] = manifest["artifacts"]["phone"]
+            (directory / "android-release.json").write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "target metadata"):
+                release.verify_assets(directory)
+
     def test_download_includes_both_apks_and_provenance(self):
         with patch.object(release, "run") as command:
             release.download("owner/repo", "2026-10-09-alpha1", Path("assets"))

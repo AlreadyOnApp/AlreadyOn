@@ -132,6 +132,11 @@ def verify_assets(directory, source=None):
         raise ValueError("APK checksum does not match release provenance")
     if manifest.get("tv_apk_sha256") != digest(directory / ASSETS[3]):
         raise ValueError("TV APK checksum does not match release provenance")
+    # Older candidate metadata remains valid for promotion; new metadata names both updater targets.
+    if "artifacts" in manifest:
+        for target, name in (("phone", ASSETS[0]), ("tv", ASSETS[3])):
+            if manifest["artifacts"].get(target) != {"file": name, "sha256": digest(directory / name)}:
+                raise ValueError("APK target metadata does not match release provenance")
     sums = (directory / "SHA256SUMS").read_text()
     required = "".join(f"{digest(directory / name)}  {name}\n"
                        for name in (ASSETS[0], ASSETS[2], ASSETS[3]))
@@ -243,7 +248,10 @@ def candidate(repo, tag, sha, code, directory):
     manifest = {"source_sha": sha, "version_name": tag, "version_code": code,
                 "package": "io.github.alreadyonapp.alreadyon",
                 "apk_sha256": digest(directory / ASSETS[0]),
-                "tv_apk_sha256": digest(directory / ASSETS[3])}
+                "tv_apk_sha256": digest(directory / ASSETS[3]),
+                "artifacts": {
+                    "phone": {"file": ASSETS[0], "sha256": digest(directory / ASSETS[0])},
+                    "tv": {"file": ASSETS[3], "sha256": digest(directory / ASSETS[3])}}}
     (directory / ASSETS[2]).write_text(json.dumps(manifest, indent=2) + "\n")
     (directory / ASSETS[1]).write_text("".join(
         f"{digest(directory / name)}  {name}\n" for name in (ASSETS[0], ASSETS[2], ASSETS[3])))
