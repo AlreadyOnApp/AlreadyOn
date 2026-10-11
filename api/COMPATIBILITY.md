@@ -31,3 +31,5 @@ Channel filters accept `excludedGenres` (exclusions win) and `requireKnownYear`.
 Native account PIN sign-in now requires both `username` and `pin` in `POST /api/auth/tv-login`. A PIN supplied with another account’s username is rejected. Phone/tablet and TV use this shared LAN-only flow after discovery or a 30-second manual-address fallback.
 
 Native PIN sign-in now issues a persistent, revocable session; browser expiry settings still apply to browser sign-in. Valid native sessions migrate to persistence; expired/revoked sessions are never restored. Auth status refreshes migrated native cookies.
+
+The temporary `DELETE /api/testing/commercial` operation has been removed. Playback no longer offers deletion of commercial library files.

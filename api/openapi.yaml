@@ -158,31 +158,6 @@ paths:
         '400': { description: Restore failed }
         '401': { description: Authentication required }
         '403': { description: Cross-site request refused }
-  /api/testing/commercial:
-    delete:
-      x-alreadyon-roles: [owner]
-      summary: Permanently delete the currently presented commercial (temporary testing only)
-      description: Requires management authentication. Remove this operation before public release. File must belong to a configured writable commercial folder.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [channelId, mediaFileId, entryStartsAt]
-              properties:
-                channelId: { type: integer, format: int64 }
-                mediaFileId: { type: integer, format: int64 }
-                entryStartsAt: { type: string, format: date-time }
-      responses:
-        '204': { description: File permanently deleted and catalog marked missing }
-        '400': { description: Invalid request }
-        '401': { description: Authentication required }
-        '403': { description: Outside configured commercial folders }
-        '409': { description: Stale airing or unavailable commercial }
-        '500': { description: Filesystem or catalog failure }
-
   /api/tv/server:
     get:
       x-alreadyon-roles: [public]

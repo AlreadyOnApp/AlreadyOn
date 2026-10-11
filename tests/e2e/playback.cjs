@@ -3534,64 +3534,6 @@ const noWorkers = async (unreleased = () => 0) => {
     );
   }
 
-  async function deleteCommercialUi() {
-    seed();
-    const file = path.join(root, "media", "delete-test.mp4");
-    fs.copyFileSync(path.join(root, "media", "program.mp4"), file);
-    cp.execFileSync("python3", [
-      "-c",
-      `
-import sqlite3,sys,json,time
-c=sqlite3.connect(sys.argv[1]); now=int(time.time())
-c.execute("UPDATE folder_settings SET commercial_paths=?",(json.dumps([sys.argv[3]]),))
-c.execute("INSERT INTO media_files(id,root_kind,path,size_bytes,modified_unix,first_seen_unix,last_seen_unix,duration_seconds,status) VALUES(992,'commercial',?,1,0,0,0,120,'ok')",(sys.argv[2],))
-c.execute("DELETE FROM schedule_entries WHERE channel_id=999")
-c.execute("INSERT INTO schedule_entries(channel_id,media_file_id,kind,source_offset_seconds,duration_seconds,starts_at_unix,ends_at_unix) VALUES(999,992,'commercial',0,90,?,?)",(now-10,now+80))
-c.execute("INSERT INTO schedule_entries(channel_id,media_file_id,kind,source_offset_seconds,duration_seconds,starts_at_unix,ends_at_unix) VALUES(999,999,'program',0,90,?,?)",(now+80,now+170))
-c.commit()
-`,
-      path.join(root, "data/alreadyon.db"),
-      file,
-      path.dirname(file),
-    ]);
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    page.on("pageerror", (e) => errors.push(e.message));
-    await login(page);
-    await page.goto(url + "/?channel=999");
-    const button = page.getByRole("button", {
-      name: "Delete Commercial",
-      exact: true,
-    });
-    await button.waitFor();
-    await playing(page);
-    const response = page.waitForResponse((r) =>
-      r.url().endsWith("/api/testing/commercial"),
-    );
-    await button.click();
-    assert(
-      (await response).status() === 204,
-      "Delete commercial API succeeded",
-    );
-    assert(
-      !fs.existsSync(file),
-      "The synthetic commercial file was physically removed",
-    );
-    await button.waitFor({ state: "detached" });
-    await page.goto(url + "/?channel=998");
-    await playing(page);
-    assert(
-      (await button.count()) === 0,
-      "Delete control is absent during programs",
-    );
-    await leave(page);
-    await context.close();
-    seed();
-    console.log(
-      "PASS: commercial-only player control permanently removes its synthetic file",
-    );
-  }
-
   async function advancedCapabilities() {
     // Verify negotiation and fail-closed behavior, not physical HDR/AVR output.
     for (const scenario of [
@@ -3678,7 +3620,6 @@ c.commit()
         seed,
       });
     // Run permanent deletion before folder-setting scenarios trigger asynchronous rescans.
-    if (!only || only.includes("delete-commercial")) await deleteCommercialUi();
     if (!only || only.includes("capabilities")) await advancedCapabilities();
     if (!only || only.includes("codec-help"))
       await require("./codec-help.cjs")({ browser, login, assert });

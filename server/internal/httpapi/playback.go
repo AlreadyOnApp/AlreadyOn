@@ -50,7 +50,6 @@ func NewPlaybackHTTP(db *sql.DB, sessions *playback.Sessions, manager *playback.
 }
 
 func (p *PlaybackHTTP) register(mux *http.ServeMux) {
-	mux.HandleFunc("DELETE /api/testing/commercial", p.deleteCommercial)
 	mux.HandleFunc("POST /api/playback/activity", p.reportActivity)
 	mux.HandleFunc("DELETE /api/playback/activity", p.endActivity)
 	mux.HandleFunc("GET /api/server/activity", p.serverActivity)

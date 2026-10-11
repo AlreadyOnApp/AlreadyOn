@@ -229,7 +229,7 @@ func TestRoleAndPasswordChangeGates(t *testing.T) {
 		{"POST", "/api/admin/api-keys"}, {"GET", "/api/channels"}, {"POST", "/api/channels"},
 		{"GET", "/api/settings"}, {"POST", "/api/library/scan"},
 		{"GET", "/api/settings/folders/browse"}, {"GET", "/api/settings/folders"}, {"PUT", "/api/settings/folders"},
-		{"DELETE", "/api/testing/commercial"}, {"GET", "/api/channels/5/preview"},
+		{"GET", "/api/channels/5/preview"},
 		{"GET", "/api/some-future-route"}, {"PUT", "/api/guide"},
 	}
 	for _, c := range allowed {
