@@ -135,6 +135,9 @@ jobs:
           revision: ${{ needs.select.outputs.revision }}
           ci-base: ${{ needs.bases.outputs.ci }}
           runtime-base: ${{ needs.bases.outputs.runtime }}
+      - uses: ./.github/actions/security-scan
+        with:
+          image: alreadyon-ci:candidate
       - name: Refuse publication from an outdated dev tip
         env:
           GH_TOKEN: ${{ github.token }}
