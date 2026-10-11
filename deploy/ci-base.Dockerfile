@@ -12,13 +12,16 @@ COPY --from=node-toolchain /usr/local/ /usr/local/
 COPY --from=go-toolchain /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:/home/ubuntu/go/bin:$PATH \
     PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Only npm is used by the checked-in build; remove unused package-manager shims.
+RUN rm -rf /usr/local/lib/node_modules/corepack \
+    && rm -f /usr/local/bin/corepack /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && apt-get update && apt-get install -y --no-install-recommends \
     make python3 python3-yaml sqlite3 procps xvfb xauth \
     && rm -rf /var/lib/apt/lists/*
 COPY web/package.json web/package-lock.json /tmp/browser-install/
 RUN cd /tmp/browser-install && npm ci \
-    && npx playwright install --with-deps chromium \
+    && npx playwright install --with-deps --only-shell chromium \
     && chmod -R a+rX /opt/playwright \
-    && rm -rf /tmp/browser-install /var/lib/apt/lists/*
+    && rm -rf /tmp/browser-install /var/lib/apt/lists/* /root/.npm
 WORKDIR /workspaces/alreadyon
 CMD ["sleep", "infinity"]

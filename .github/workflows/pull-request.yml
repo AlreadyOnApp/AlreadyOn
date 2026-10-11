@@ -16,7 +16,7 @@ jobs:
     uses: ./.github/workflows/quality.yml
   tests:
     runs-on: ubuntu-26.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,7 +45,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=source-validation-runtime
       - name: Build local CI tooling image on the patched runtime
         run: |
-          docker build \
+          docker build --builder default \
             --file deploy/ci-base.Dockerfile \
             --target ci-base \
             --build-arg RUNTIME_BASE=alreadyon-validation:runtime \
@@ -55,3 +55,19 @@ jobs:
         with:
           ci-base: alreadyon-validation:ci
           pull-base: 'false'
+      - name: Build the exact PR runtime candidate
+        run: |
+          docker build --builder default \
+            --file deploy/Dockerfile --target runtime \
+            --build-arg CI_BASE=alreadyon-validation:ci \
+            --build-arg RUNTIME_BASE=alreadyon-validation:runtime \
+            --build-arg VCS_REF="$(git rev-parse HEAD)" \
+            --build-arg BUILD_TIMESTAMP="$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --tag alreadyon-ci:candidate .
+      - name: Validate packaged runtime with disposable fixtures
+        run: python3 tests/integration/container.py
+        env:
+          CONTAINER_IMAGE: alreadyon-ci:candidate
+      - uses: ./.github/actions/security-scan
+        with:
+          image: alreadyon-ci:candidate

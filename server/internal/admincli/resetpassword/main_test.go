@@ -1,5 +1,5 @@
 // Exercise password reset against isolated account data, including short passwords.
-package main
+package resetpassword
 
 import (
 	"context"
@@ -16,8 +16,8 @@ import (
 
 func TestResetPasswordCommand(t *testing.T) {
 	work := t.TempDir()
-	bin := filepath.Join(work, "reset-password")
-	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+	bin := filepath.Join(work, "alreadyon-reset-password")
+	if out, err := exec.Command("go", "build", "-o", bin, "../../../cmd/server").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, out)
 	}
 	run := func(stdin string, args ...string) (string, error) {

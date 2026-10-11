@@ -22,6 +22,7 @@ android {
         release {
             // Ship the same optimization measured on physical TVs with limited CPU and memory.
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
         }
         // Same debug identity/key preserves device sessions while measuring optimized, non-debuggable code.
