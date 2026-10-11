@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime
 import json
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -39,11 +40,17 @@ def remote_ref_sha(ref, tags=False):
     return refs.get(f'refs/{kind}/{ref}^{{}}', refs.get(f'refs/{kind}/{ref}'))
 
 
-def active_release_day(remote_tags):
+def active_release_day(remote_tags, baseline=None):
     dates = {match[0] for name in remote_tags
              if (match := re.fullmatch(r'(\d{4}-\d{2}-\d{2})', name))}
     stable = {match[1] for name in remote_tags
               if (match := re.fullmatch(r'(\d{4}-\d{2}-\d{2})-(?:Stable|stable)', name))}
+    # A maintainer can snap to a new cycle without deleting historical preview tags.
+    if baseline:
+        baseline = release_day(baseline)
+        dates = {day for day in dates if day >= baseline}
+        if baseline not in stable:
+            dates.add(baseline)
     active = sorted(dates - stable)
     if len(active) > 1:
         raise ValueError('Multiple date releases are active; resolve their promotion state first')
@@ -70,7 +77,8 @@ def publish_release_branch(value=None):
     if not ancestor(dev, head):
         sys.exit('Local build must include current origin/dev before opening its release PR')
     remote_tags = release_tags()
-    active_day = active_release_day(remote_tags)
+    baseline = Path(__file__).resolve().parents[1] / 'release-date.txt'
+    active_day = active_release_day(remote_tags, baseline.read_text().strip() if baseline.exists() else None)
     day = release_day(value or active_day)
     if active_day and day != active_day:
         sys.exit(f'Release {active_day} must reach Stable before starting release {day}')
