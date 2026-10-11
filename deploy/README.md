@@ -14,7 +14,7 @@ The runtime uses HTTPS port 19900 for UI, API and media. Port 19902 is reserved 
 
 Native clients discover servers by scanning the current IPv4 LAN's published HTTPS port 19900 for up to 30 seconds. Standard Docker bridge networking is supported; host mode, multicast and an extra discovery port are unnecessary. Publish 19900 on a LAN-reachable host address. Guest isolation and firewalls can prevent discovery. Port 19901 is unused.
 
-Traefik can keep its existing Docker network, HTTPS backend or TLS passthrough to 19900, and HTTP-01 route to 19902. Traefik may manage Let's Encrypt on public ports 80/443; if AlreadyOn manages certificates, forward the challenge path to its HTTP listener on 19902 instead. Native LAN pairing connects directly to 19900.
+For direct public access, map host port 443 to container HTTPS port 19900 and forward WAN TCP/443 to host TCP/443. If AlreadyOn manages certificates with HTTP-01, map host port 80 to container challenge port 19902 and forward WAN TCP/80 to host TCP/80. External port 80 is required for HTTP-01. The challenge listener serves only ACME validation requests, not application traffic or general redirects. Native LAN pairing connects directly to 19900. A reverse proxy is optional; preserve the application certificate with TLS passthrough when AlreadyOn owns TLS.
 
 The example documents supported identity/timezone/port settings. Keep tokens, custom domains and private host configuration in local files excluded from Git. Do not add undocumented environment variables.
 
