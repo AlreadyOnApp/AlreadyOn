@@ -10,9 +10,8 @@ Maintainers control releases. Checkout ownership and deployment credentials belo
 
 Use one checkout, local `build`, and preview at `https://localhost:5173`. A dated dev PR runs quality, CodeQL, Go/browser e2e, disposable runtime checks and source/image scanning. After merge, release validation republishes the date image/`nightly`, advances the date tag, builds Android alpha artifacts, and deletes the merged date branch. Hotfixes reuse that date and repeat the PR gates.
 
-Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py` locally. Lint includes public-guide length and link checks. Update contracts.
+Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py` locally. Lint includes public-guide length and link checks.
 
-Conduct policy has no length limit; links remain checked.
 
 ## Approved release validation
 
