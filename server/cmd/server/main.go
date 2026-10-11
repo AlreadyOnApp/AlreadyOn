@@ -15,6 +15,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alreadyonapp/alreadyon/server/internal/admincli/accesskey"
+	"github.com/alreadyonapp/alreadyon/server/internal/admincli/clearsessions"
+	"github.com/alreadyonapp/alreadyon/server/internal/admincli/resetpassword"
+	"github.com/alreadyonapp/alreadyon/server/internal/admincli/tlscli"
 	"github.com/alreadyonapp/alreadyon/server/internal/auth"
 	"github.com/alreadyonapp/alreadyon/server/internal/channel"
 	"github.com/alreadyonapp/alreadyon/server/internal/config"
@@ -38,6 +42,23 @@ import (
 )
 
 func main() {
+	// Container aliases share one executable instead of duplicating Go/SQLite runtimes.
+	// Dispatch before server configuration or startup; standalone developer commands remain.
+	switch filepath.Base(os.Args[0]) {
+	case "alreadyon-access-key":
+		accesskey.Run()
+		return
+	case "alreadyon-clear-browser-sessions":
+		clearsessions.Run()
+		return
+	case "alreadyon-reset-password":
+		resetpassword.Run()
+		return
+	case "alreadyon-tls":
+		tlscli.Run()
+		return
+	}
+
 	if run() {
 		// Started again in place (same process ID, so a container keeps running).
 		exe, err := os.Executable()

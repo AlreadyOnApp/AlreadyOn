@@ -1,5 +1,5 @@
 //go:build !unix
 
-package main
+package resetpassword
 
 func dropToDataOwner(string) error { return nil }

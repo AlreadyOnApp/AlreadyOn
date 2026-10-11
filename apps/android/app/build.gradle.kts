@@ -21,7 +21,11 @@ android {
     buildTypes {
         debug { applicationIdSuffix = providers.gradleProperty("androidDebugSuffix").orNull ?: ".debug" }
         // Release signing is intentionally unconfigured until the owner supplies a key.
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
     }
     providers.gradleProperty("androidUpdateTestAssetsDirectory").orNull?.let {
         sourceSets["androidTest"].assets.srcDir(it)

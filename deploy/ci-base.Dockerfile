@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 COPY web/package.json web/package-lock.json /tmp/browser-install/
 RUN cd /tmp/browser-install && npm ci \
-    && npx playwright install --with-deps chromium \
+    && npx playwright install --with-deps --only-shell chromium \
     && chmod -R a+rX /opt/playwright \
-    && rm -rf /tmp/browser-install /var/lib/apt/lists/*
+    && rm -rf /tmp/browser-install /var/lib/apt/lists/* /root/.npm
 WORKDIR /workspaces/alreadyon
 CMD ["sleep", "infinity"]
