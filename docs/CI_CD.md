@@ -8,7 +8,7 @@ Maintainers control releases. Checkout ownership and deployment credentials belo
 
 `release-date.txt` pins the active cycle to `2026-10-11`, superseding older previews. Publishing reuses it until Stable on main; afterward a new date can begin.
 
-Use one checkout, local `build`, and preview at `https://localhost:5173`. A date-named dev PR runs quality, CodeQL, Go tests and full browser e2e. After merge, release validation republishes the date image/`nightly`, advances the date tag, builds Android alpha artifacts, and deletes the merged date branch. Hotfixes reuse that date and repeat the PR gates.
+Use one checkout, local `build`, and preview at `https://localhost:5173`. A dated dev PR runs quality, CodeQL, Go/browser e2e, disposable runtime checks and source/image scanning. After merge, release validation republishes the date image/`nightly`, advances the date tag, builds Android alpha artifacts, and deletes the merged date branch. Hotfixes reuse that date and repeat the PR gates.
 
 Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py` locally. Lint includes public-guide length and link checks. Update contracts.
 
@@ -40,7 +40,7 @@ Dev image builds run after validated date PR merges. Test/main image promotions 
 
 ## Public automation
 
-Source Validation uses read-only credentials. PRs build patched runtime/CI images locally; no publication credentials are exposed.
+PR validation builds patched runtime/CI images and scans the exact candidate with read-only credentials; publication credentials remain unavailable. Vulnerability counts are report-only; scanner failures block the gate.
 
 CodeQL analyzes Go/TypeScript on dev/test/main; Pages publishes from main. Android automation builds alpha on dev, RC on test and Stable from RC artifacts on main; see [Android policy](ANDROID_RELEASES.md).
 
