@@ -10,7 +10,7 @@ Use one checkout, local `build`, and preview at `https://localhost:5173`. A date
 
 Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py` locally. Lint includes public-guide length and link checks. Update contracts when behavior changes.
 
-Documentation checks include pending edits; CI supplies `CI_BASE` for the full diff. Dev publication tags the release date; test/main reuse tested artifacts.
+Checks include pending edits; CI supplies `CI_BASE`. Conduct policy has no length limit; links remain checked. Dev tags the date; test/main reuse artifacts.
 
 ## Approved release validation
 

@@ -16,9 +16,9 @@ Start at alpha1; each dev hotfix increments alpha until RC1. RC1 reuses alpha AP
 
 After dev e2e passes, the plain date tag advances to that merge. Alpha changelogs include marked Android/TV notes since the latest earlier-date Android release, excluding server-only notes. Promotions reuse the tested image digest and signed APKs; no rebuild/re-sign occurs. Earlier dates remain intact.
 
-Each release attaches both APKs, `SHA256SUMS` and `android-release.json`. Promotions retain the APK `versionName`/`versionCode`; changing a release title does not rename its tag.
+Each release attaches both APKs, `SHA256SUMS` and `android-release.json`. Promotions retain the APK `versionName`/`versionCode`; titles do not rename tags.
 
-For a maintainer-approved APK-only alpha, dispatch **Android Alpha, RC and Stable** on `dev` with `operation=candidate`, an explicit release date and the exact dev source SHA. This signs and publishes both APKs without invoking image publication or deployment.
+Approved APK-only alpha: dispatch **Android Alpha, RC and Stable** on `dev` with `operation=candidate`, release date and exact SHA. No image publication/deployment.
 
 ## Automation and gates
 
@@ -26,8 +26,8 @@ Date PRs run quality, CodeQL and full Go/browser e2e. Dev merge validation publi
 
 ## Signing and scope
 
-Phone/tablet and [TV](GOOGLE_TV.md) APKs share permanent signing credentials and provenance. Debug apps use separate identities; validate physical devices. See [signing](ANDROID_SIGNING.md), [release notes](RELEASE_NOTES.md) and [delivery](CI_CD.md).
+Phone/tablet and [TV](GOOGLE_TV.md) APKs share permanent signing credentials and provenance. Validate debug identities and physical devices. See [signing](ANDROID_SIGNING.md), [release notes](RELEASE_NOTES.md) and [delivery](CI_CD.md).
 
 ## Application identity
 
-Android packages use the GitHub organization-owned application identity. Android treats an application ID change as a different app, so previously installed previews cannot be updated in place. Uninstall the earlier preview before installing this version; app-local settings are not transferred.
+The organization-owned application ID differs from older previews, which cannot update in place. Uninstall the earlier preview before installing this version; app-local settings are not transferred.
