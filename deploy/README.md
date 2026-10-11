@@ -2,7 +2,7 @@
 
 [![AlreadyOn](../web/public/branding/header-doc.svg)](../README.md)
 
-Use [docker-compose.example.yml](docker-compose.example.yml) as a starting point. Review every mount, port and identity setting before starting it. Published project images live at `ghcr.io/alreadyonapp/alreadyon`; availability depends on registry access.
+Use [docker-compose.example.yml](docker-compose.example.yml) as a starting point. Review mounts, ports and identity before starting. Published project images live at `ghcr.io/alreadyonapp/alreadyon`; availability depends on registry access.
 
 `stable` is the approved main release, `latest` the approved test release and `nightly` the development release. Pin a digest when reproducibility matters. Do not assume a newer mutable tag has passed your deployment's validation.
 
@@ -26,4 +26,4 @@ For development builds, `make image` builds locally and `make test-container` va
 
 Review [LICENSE](../LICENSE) and third-party codec/dependency obligations before redistributing images.
 
-The Compose example includes HTTP-01 forwarding guidance, configurable GPU group IDs, timezone, media mounts and transcode RAM sizing. Review these example values for your host before use.
+The Compose example includes HTTP-01 forwarding, GPU groups, timezone, media mounts and transcode RAM sizing.

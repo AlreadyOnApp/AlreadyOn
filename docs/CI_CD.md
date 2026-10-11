@@ -2,15 +2,17 @@
 
 [![AlreadyOn](../web/public/branding/header-doc.svg)](../README.md)
 
-The maintainer controls release gates. Checkout ownership and deployment credentials belong in ignored `.private/AGENTS.md`.
+Maintainers control releases. Checkout ownership and deployment credentials belong in ignored `.private/AGENTS.md`.
 
 ## Development and releases
 
+`release-date.txt` pins the active cycle to `2026-10-11`, superseding older previews. Publishing reuses it until Stable on main; afterward a new date can begin.
+
 Use one checkout, local `build`, and preview at `https://localhost:5173`. A date-named dev PR runs quality, CodeQL, Go tests and full browser e2e. After merge, release validation republishes the date image/`nightly`, advances the date tag, builds Android alpha artifacts, and deletes the merged date branch. Hotfixes reuse that date and repeat the PR gates.
 
-Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py` locally. Lint includes public-guide length and link checks. Update contracts when behavior changes.
+Run `make lint`, `python3 scripts/ci/check-documentation.py` and `python3 scripts/ci/check-syntax.py` locally. Lint includes public-guide length and link checks. Update contracts.
 
-Documentation checks include pending edits; CI supplies `CI_BASE` for the full diff. Dev publication tags the release date; test/main reuse tested artifacts.
+Conduct policy has no length limit; links remain checked.
 
 ## Approved release validation
 
@@ -22,7 +24,7 @@ Documentation checks include pending edits; CI supplies `CI_BASE` for the full d
 4. Full synthetic browser suite (`make test-e2e`).
 5. Disposable packaged-runtime checks (`make test-container`).
 
-Go tests use temporary source/storage, excluding local databases, credentials and media. Packages run sequentially.
+Go tests use temporary storage; live data remains intact.
 
 Resolve failures before promotion. Record the commit, image ID/digest and actual results. Live checks are non-destructive; synthetic suites use isolated data.
 

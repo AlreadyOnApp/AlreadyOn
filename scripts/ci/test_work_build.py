@@ -20,10 +20,10 @@ class WorkBranchTest(unittest.TestCase):
                 patch.object(work_helper, 'remote_ref_sha', return_value=None), \
                 patch.object(work_helper.subprocess, 'run') as commands, \
                 patch.object(work_helper.subprocess, 'check_output', return_value='[]'):
-            work_helper.publish_release_branch('2026-10-10')
+            work_helper.publish_release_branch('2026-10-11')
         invocations = [call.args[0] for call in commands.call_args_list]
-        self.assertIn(['git', 'push', 'origin', 'HEAD:refs/heads/2026-10-10'], invocations)
-        self.assertIn(['git', 'tag', '-f', '2026-10-10', 'a' * 40], invocations)
+        self.assertIn(['git', 'push', 'origin', 'HEAD:refs/heads/2026-10-11'], invocations)
+        self.assertIn(['git', 'tag', '-f', '2026-10-11', 'a' * 40], invocations)
         self.assertTrue(any(call[:4] == ['gh', 'pr', 'create', '--base'] for call in invocations))
 
     def test_publish_blocks_new_date_while_release_active(self):
@@ -32,10 +32,10 @@ class WorkBranchTest(unittest.TestCase):
         spec.loader.exec_module(work_helper)
         with patch.object(work_helper, 'git', side_effect=['', 'build', 'a' * 40, 'a' * 40]), \
                 patch.object(work_helper, 'ancestor', return_value=True), \
-                patch.object(work_helper, 'release_tags', return_value=['2026-10-10']), \
+                patch.object(work_helper, 'release_tags', return_value=['2026-10-11']), \
                 patch.object(work_helper.subprocess, 'run') as commands:
             with self.assertRaisesRegex(SystemExit, 'must reach Stable'):
-                work_helper.publish_release_branch('2026-10-11')
+                work_helper.publish_release_branch('2026-10-12')
         self.assertFalse(any(call.args[0][1] == 'push' for call in commands.call_args_list))
 
     def test_active_release_date_blocks_a_new_release_date(self):
@@ -49,6 +49,8 @@ class WorkBranchTest(unittest.TestCase):
         self.assertIsNone(work_helper.active_release_day(['2026-10-10', '2026-10-10-stable']))
         with self.assertRaisesRegex(ValueError, 'Multiple date releases'):
             work_helper.active_release_day(['2026-10-10', '2026-10-11'])
+        self.assertEqual(work_helper.active_release_day(['2026-10-10'], '2026-10-11'), '2026-10-11')
+        self.assertIsNone(work_helper.active_release_day(['2026-10-10', '2026-10-11', '2026-10-11-Stable'], '2026-10-11'))
 
     def test_stale_build_fast_forwards_to_latest_dev(self):
         with tempfile.TemporaryDirectory() as root:
