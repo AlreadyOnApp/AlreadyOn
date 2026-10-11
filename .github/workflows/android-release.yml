@@ -19,9 +19,9 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Promote exact tested APK artifacts
+        description: Build an alpha on dev or promote exact tested APK artifacts
         type: choice
-        options: [promote-test, stable]
+        options: [candidate, promote-test, stable]
         default: promote-test
         required: true
       release_date:
