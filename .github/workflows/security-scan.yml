@@ -26,6 +26,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
       - name: Reassess without rebuilding or retagging
         env:
           SCAN_IMAGE: ${{ inputs.image }}
@@ -37,6 +39,8 @@ jobs:
           printf '%s' "$GH_TOKEN" | python3 scripts/security/scan.py \
             --trivy "$RUNNER_TEMP/security-tools/trivy" --registry-user "$REGISTRY_USER" \
             --image "$SCAN_IMAGE" --output "$RUNNER_TEMP/security-report"
-          printf '\n### Vulnerability reassessment (report-only)\n\n```json\n' >> "$GITHUB_STEP_SUMMARY"
-          cat "$RUNNER_TEMP/security-report/summary.json" >> "$GITHUB_STEP_SUMMARY"
-          printf '\n```\nRaw reports are not uploaded from public workflows.\n' >> "$GITHUB_STEP_SUMMARY"
+          {
+            printf '\n### Vulnerability reassessment (report-only)\n\n```json\n'
+            cat "$RUNNER_TEMP/security-report/summary.json"
+            printf '\n```\nRaw reports are not uploaded from public workflows.\n'
+          } >> "$GITHUB_STEP_SUMMARY"

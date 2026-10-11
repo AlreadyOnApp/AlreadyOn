@@ -13,6 +13,8 @@ runs:
         distribution: temurin
         java-version: '17'
     - uses: android-actions/setup-android@v3
+      with:
+        packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
     - name: Scan before publication
       shell: bash
       run: |
@@ -21,8 +23,10 @@ runs:
         docker save "$SCAN_IMAGE" -o "$RUNNER_TEMP/security-candidate.tar"
         python3 scripts/security/scan.py --trivy "$RUNNER_TEMP/security-tools/trivy" \
           --image-archive "$RUNNER_TEMP/security-candidate.tar" --output "$RUNNER_TEMP/security-report"
-        printf '\n### Vulnerability scan (report-only)\n\n```json\n' >> "$GITHUB_STEP_SUMMARY"
-        cat "$RUNNER_TEMP/security-report/summary.json" >> "$GITHUB_STEP_SUMMARY"
-        printf '\n```\nRaw reports are not uploaded from public workflows.\n' >> "$GITHUB_STEP_SUMMARY"
+        {
+          printf '\n### Vulnerability scan (report-only)\n\n```json\n'
+          cat "$RUNNER_TEMP/security-report/summary.json"
+          printf '\n```\nRaw reports are not uploaded from public workflows.\n'
+        } >> "$GITHUB_STEP_SUMMARY"
       env:
         SCAN_IMAGE: ${{ inputs.image }}
